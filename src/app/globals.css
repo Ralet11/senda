@@ -1,8 +1,16 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+:root,
+:root[data-theme="light"] {
+  --background: #e8e0d4;
+  --foreground: #342f29;
+  --surface: #f1e9de;
+  --surface-muted: #e3d8ca;
+  --surface-strong: #d5c7b5;
+  --border-soft: #c3b29f;
+  --text-strong: #332e28;
+  --text-default: #4f483f;
+  --text-muted: #71685d;
 }
 
 @theme inline {
@@ -12,15 +20,95 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root[data-theme="dark"] {
+  --background: #201c19;
+  --foreground: #e6ddd1;
+  --surface: #2a2521;
+  --surface-muted: #342e29;
+  --surface-strong: #433b34;
+  --border-soft: #584d43;
+  --text-strong: #f3ebdf;
+  --text-default: #d8ccbd;
+  --text-muted: #aea294;
+}
+
+html {
+  color-scheme: light;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--surface-strong) 70%, #c9baa5 30%);
+  color: var(--text-strong);
+}
+
+input,
+textarea,
+select {
+  background: var(--surface);
+  color: var(--foreground);
+}
+
+@layer utilities {
+  .bg-white {
+    background-color: var(--surface) !important;
+  }
+
+  .bg-zinc-50 {
+    background-color: var(--background) !important;
+  }
+
+  .bg-zinc-100 {
+    background-color: var(--surface-muted) !important;
+  }
+
+  .bg-sky-50 {
+    background-color: color-mix(in srgb, var(--surface) 80%, #dcecf7 20%) !important;
+  }
+
+  .bg-emerald-50 {
+    background-color: color-mix(in srgb, var(--surface) 78%, #d8efe3 22%) !important;
+  }
+
+  .bg-amber-50 {
+    background-color: color-mix(in srgb, var(--surface) 76%, #f1e2be 24%) !important;
+  }
+
+  .bg-red-50 {
+    background-color: color-mix(in srgb, var(--surface) 78%, #f4d8d6 22%) !important;
+  }
+
+  .shadow-sm {
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--text-strong) 8%, transparent) !important;
+  }
+
+  .border-zinc-300,
+  .border-zinc-200 {
+    border-color: var(--border-soft) !important;
+  }
+
+  .text-zinc-950,
+  .text-zinc-900,
+  .text-zinc-800 {
+    color: var(--text-strong) !important;
+  }
+
+  .text-zinc-700,
+  .text-zinc-600 {
+    color: var(--text-default) !important;
+  }
+
+  .text-zinc-500,
+  .text-zinc-400 {
+    color: var(--text-muted) !important;
+  }
 }

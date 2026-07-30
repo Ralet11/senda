@@ -1,0 +1,189 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum GlobalRole {
+  ADMIN // Ramiro / equipo interno
+  CLIENT
+}
+
+enum ProjectMemberRole {
+  OWNER // contacto principal del cliente en ese proyecto
+  COLLABORATOR // otro miembro del lado del cliente
+  TEAM // alguien de Senda trabajando en el proyecto
+}
+
+enum ProjectPhase {
+  DISCOVERY
+  DESIGN
+  DEVELOPMENT
+  QA
+  LAUNCHED
+}
+
+enum ProposalStatus {
+  PENDING
+  ACCEPTED
+  DISCARDED
+}
+
+enum ProjectUpdateKind {
+  INTERNAL
+  CLIENT
+}
+
+enum ProjectUpdateStatus {
+  DRAFT
+  PUBLISHED
+  DISCARDED
+}
+
+enum ProjectUpdateSource {
+  MANUAL
+  AGENT
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  globalRole   GlobalRole @default(CLIENT)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships     ProjectMember[]
+  messages        Message[]
+  reviewedProposals Proposal[] @relation("ProposalReviewer")
+  sessions        Session[]
+  projectUpdates  ProjectUpdate[]
+}
+
+// Sesión persistida en DB (en vez de JWT) para poder invalidar logins con un delete.
+model Session {
+  id           String   @id @default(cuid())
+  tokenHash    String   @unique // sha256 del token que viaja en la cookie; nunca guardamos el token en claro
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+}
+
+model Project {
+  id          String       @id @default(cuid())
+  name        String
+  phase       ProjectPhase @default(DISCOVERY)
+  progress    Int          @default(0) // 0-100
+  summary     String? // brief usado como contexto del AI assistant
+  repoProvider String?
+  repoLocalPath String?
+  repoDefaultBranch String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  members       ProjectMember[]
+  milestones    Milestone[]
+  activityLogs  ActivityLog[]
+  messages      Message[]
+  proposals     Proposal[]
+  contextChunks ProjectContextChunk[]
+  updates       ProjectUpdate[]
+}
+
+model ProjectMember {
+  id        String            @id @default(cuid())
+  role      ProjectMemberRole
+  project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime          @default(now())
+
+  @@unique([projectId, userId])
+}
+
+model Milestone {
+  id        String    @id @default(cuid())
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  title     String
+  dueDate   DateTime?
+  doneAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  message   String // ej: "Se completó el login de clientes"
+  createdAt DateTime @default(now())
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  author    User?    @relation(fields: [authorId], references: [id])
+  authorId  String?
+  isFromAssistant Boolean @default(false)
+  body      String
+  createdAt DateTime @default(now())
+}
+
+// Idea/pedido que el AI assistant detecta como accionable en una conversación
+// y que cae en la bandeja interna para que el equipo la revise.
+model Proposal {
+  id          String         @id @default(cuid())
+  project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String
+  title       String
+  description String
+  status      ProposalStatus @default(PENDING)
+  reviewedBy  User?          @relation("ProposalReviewer", fields: [reviewedById], references: [id])
+  reviewedById String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+// Fragmentos de contexto (brief, docs, historial) embebidos para RAG del AI assistant.
+// El embedding se agrega vía migración manual con pgvector (ver docs/ai-assistant.md).
+model ProjectContextChunk {
+  id        String   @id @default(cuid())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  source    String // ej: "brief", "activity_log", "chat"
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model ProjectUpdate {
+  id             String              @id @default(cuid())
+  project        Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId      String
+  kind           ProjectUpdateKind   @default(CLIENT)
+  status         ProjectUpdateStatus @default(DRAFT)
+  source         ProjectUpdateSource @default(MANUAL)
+  title          String
+  summary        String
+  nextSteps      String?
+  risks          String?
+  suggestedPhase ProjectPhase?
+  suggestedProgress Int?
+  createdByUser  User?               @relation(fields: [createdByUserId], references: [id])
+  createdByUserId String?
+  createdByAgent String?
+  publishedAt    DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([projectId, status, createdAt])
+}
