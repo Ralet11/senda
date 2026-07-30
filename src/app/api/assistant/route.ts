@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAssistantReply } from "@/lib/assistant";
 import { requireProjectMember } from "@/lib/auth";
+import { consumeRateLimit } from "@/lib/rate-limit";
+
+const MAX_MESSAGE_LENGTH = 4_000;
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -15,7 +18,25 @@ export async function POST(request: Request) {
     );
   }
 
-  await requireProjectMember(projectId);
+  if (projectId.length > 128 || message.length > MAX_MESSAGE_LENGTH) {
+    return NextResponse.json(
+      { error: "El mensaje supera el máximo de 4000 caracteres." },
+      { status: 400 },
+    );
+  }
+
+  const user = await requireProjectMember(projectId);
+  const rateLimit = consumeRateLimit({
+    key: `assistant:${user.id}:${projectId}`,
+    limit: 12,
+    windowMs: 60 * 1000,
+  });
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Demasiadas consultas. Esperá un minuto antes de continuar." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
+    );
+  }
 
   try {
     const result = await createAssistantReply(projectId, message);

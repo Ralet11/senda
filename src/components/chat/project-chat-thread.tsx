@@ -81,10 +81,6 @@ export function ProjectChatThread({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  useEffect(() => {
-    setMessages(initialMessages);
-  }, [initialMessages]);
-
   useLayoutEffect(() => {
     const element = textareaRef.current;
     if (!element) return;

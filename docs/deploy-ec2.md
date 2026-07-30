@@ -69,6 +69,7 @@ DATABASE_URL="postgresql://senda_user:CAMBIAR_PASSWORD@127.0.0.1:5432/senda?sche
 OPENAI_API_KEY="sk-..."
 OPENAI_MODEL="gpt-5"
 SENDA_AGENT_TOKEN="token-largo-y-unico"
+PROJECT_REPOS_ROOT="/home/ubuntu/repos"
 NODE_ENV="production"
 PORT="3010"
 ```
@@ -184,6 +185,7 @@ Validar:
 - chat
 - assistant
 - `POST /api/external/project-updates`
+- assistant con una pregunta técnica sobre un repo dentro de `PROJECT_REPOS_ROOT`
 
 ## 11. Flujo de actualizacion de codigo
 
@@ -220,4 +222,5 @@ curl -X POST https://senda.prismadevs.com/api/external/project-updates \
 - No compartir la DB con otros proyectos.
 - No reutilizar puertos ya usados (`3001`, `3005`, `4000`).
 - Mantener Senda aislado en `3010`.
+- `PROJECT_REPOS_ROOT` es obligatorio para habilitar búsquedas de código del assistant. Debe contener únicamente repos permitidos y nunca rutas amplias del servidor.
 - El server actual ya tiene otros proyectos; cualquier cambio en Nginx debe pasar por `nginx -t` antes de recargar.

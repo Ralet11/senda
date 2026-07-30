@@ -29,6 +29,7 @@ const IGNORED_DIRECTORIES = new Set([
   "coverage",
   ".turbo",
 ]);
+const MAX_FILE_SIZE_BYTES = 256 * 1024;
 
 type RepoSearchResult = {
   path: string;
@@ -88,21 +89,20 @@ export function resolveProjectRepoPath(repoLocalPath: string | null) {
   if (!trimmed) return null;
 
   const configuredRoot = process.env.PROJECT_REPOS_ROOT?.trim();
-
-  if (configuredRoot) {
-    const root = path.resolve(configuredRoot);
-    const resolved = path.isAbsolute(trimmed)
-      ? path.resolve(trimmed)
-      : path.resolve(root, trimmed);
-
-    if (!isWithinParent(root, resolved)) {
-      throw new Error("Repo path escapes PROJECT_REPOS_ROOT");
-    }
-
-    return resolved;
+  if (!configuredRoot) {
+    throw new Error("PROJECT_REPOS_ROOT is required for repository search");
   }
 
-  return path.resolve(trimmed);
+  const root = path.resolve(/* turbopackIgnore: true */ configuredRoot);
+  const resolved = path.isAbsolute(trimmed)
+    ? path.resolve(/* turbopackIgnore: true */ trimmed)
+    : path.resolve(/* turbopackIgnore: true */ root, trimmed);
+
+  if (!isWithinParent(root, resolved)) {
+    throw new Error("Repo path escapes PROJECT_REPOS_ROOT");
+  }
+
+  return resolved;
 }
 
 async function collectCandidateFiles(repoPath: string, limit = 250) {
@@ -113,7 +113,9 @@ async function collectCandidateFiles(repoPath: string, limit = 250) {
     const current = queue.shift();
     if (!current) break;
 
-    const entries = await fs.readdir(current, { withFileTypes: true });
+    const entries = await fs.readdir(/* turbopackIgnore: true */ current, {
+      withFileTypes: true,
+    });
 
     for (const entry of entries) {
       const fullPath = path.join(current, entry.name);
@@ -142,7 +144,25 @@ export async function searchProjectRepo(params: {
   repoLocalPath: string | null;
   question: string;
 }) {
-  const resolvedRepoPath = resolveProjectRepoPath(params.repoLocalPath);
+  if (!process.env.PROJECT_REPOS_ROOT?.trim()) {
+    return {
+      repoAvailable: false,
+      reason: "La búsqueda de repos no está habilitada en este servidor.",
+      results: [] as RepoSearchResult[],
+    };
+  }
+
+  let resolvedRepoPath: string | null;
+  try {
+    resolvedRepoPath = resolveProjectRepoPath(params.repoLocalPath);
+  } catch {
+    return {
+      repoAvailable: false,
+      reason: "La ruta configurada del repo no es válida.",
+      results: [] as RepoSearchResult[],
+    };
+  }
+
   if (!resolvedRepoPath) {
     return {
       repoAvailable: false,
@@ -173,7 +193,10 @@ export async function searchProjectRepo(params: {
   const scored: RepoSearchResult[] = [];
 
   for (const filePath of files) {
-    const content = await fs.readFile(filePath, "utf8").catch(() => null);
+    const stat = await fs.stat(/* turbopackIgnore: true */ filePath).catch(() => null);
+    if (!stat?.isFile() || stat.size > MAX_FILE_SIZE_BYTES) continue;
+
+    const content = await fs.readFile(/* turbopackIgnore: true */ filePath, "utf8").catch(() => null);
     if (!content) continue;
 
     const score = scoreFile(filePath, content, terms);

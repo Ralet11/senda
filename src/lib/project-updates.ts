@@ -171,11 +171,12 @@ export async function publishProjectUpdate(
     where: {
       id: input.updateId,
       projectId: input.projectId,
+      status: "DRAFT",
     },
   });
 
   if (!update) {
-    throw new Error("PROJECT_UPDATE_NOT_FOUND");
+    throw new Error("PROJECT_UPDATE_NOT_PUBLISHABLE");
   }
 
   const published = await tx.projectUpdate.update({

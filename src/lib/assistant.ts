@@ -314,11 +314,11 @@ async function getRecentConversation(projectId: string) {
         in: ["assistant_user", "assistant_reply"],
       },
     },
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: "desc" },
     take: 12,
   });
 
-  return chunks.map((chunk) => ({
+  return chunks.reverse().map((chunk) => ({
     role: chunk.source === "assistant_user" ? ("user" as const) : ("assistant" as const),
     content: chunk.content,
   }));

@@ -374,11 +374,11 @@ export async function publishProjectUpdateAction(projectId: string, updateId: st
       }),
     );
   } catch (error) {
-    if (error instanceof Error && error.message === "PROJECT_UPDATE_NOT_FOUND") {
+    if (error instanceof Error && error.message === "PROJECT_UPDATE_NOT_PUBLISHABLE") {
       redirectWithStatus(
         `/admin/projects/${projectId}`,
         "error",
-        "No se encontro el update a publicar.",
+        "El update no existe o ya no esta disponible para publicar.",
       );
     }
 
@@ -393,15 +393,24 @@ export async function publishProjectUpdateAction(projectId: string, updateId: st
 export async function discardProjectUpdateAction(projectId: string, updateId: string) {
   await requireAdmin();
 
-  await prisma.projectUpdate.updateMany({
+  const result = await prisma.projectUpdate.updateMany({
     where: {
       id: updateId,
       projectId,
+      status: "DRAFT",
     },
     data: {
       status: "DISCARDED",
     },
   });
+
+  if (result.count === 0) {
+    redirectWithStatus(
+      `/admin/projects/${projectId}`,
+      "error",
+      "El update no existe o ya no esta disponible para descartar.",
+    );
+  }
 
   revalidatePath(`/admin/projects/${projectId}`);
   redirectWithStatus(`/admin/projects/${projectId}`, "success", "Update descartado.");

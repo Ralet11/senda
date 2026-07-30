@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 type ThemeMode = "light" | "dark";
 
@@ -8,29 +8,41 @@ function applyTheme(theme: ThemeMode) {
   document.documentElement.dataset.theme = theme;
 }
 
+const THEME_CHANGE_EVENT = "senda-theme-change";
+
+function getThemeSnapshot(): ThemeMode {
+  const stored = window.localStorage.getItem("senda-theme");
+  if (stored === "dark" || stored === "light") return stored;
+
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function subscribeToTheme(onStoreChange: () => void) {
+  window.addEventListener("storage", onStoreChange);
+  window.addEventListener(THEME_CHANGE_EVENT, onStoreChange);
+
+  return () => {
+    window.removeEventListener("storage", onStoreChange);
+    window.removeEventListener(THEME_CHANGE_EVENT, onStoreChange);
+  };
+}
+
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<ThemeMode>("light");
-  const [ready, setReady] = useState(false);
+  const theme = useSyncExternalStore<ThemeMode>(
+    subscribeToTheme,
+    getThemeSnapshot,
+    () => "light",
+  );
+  const ready = useSyncExternalStore<boolean>(subscribeToTheme, () => true, () => false);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("senda-theme");
-    const nextTheme: ThemeMode =
-      stored === "dark" || stored === "light"
-        ? stored
-        : window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
-
-    applyTheme(nextTheme);
-    setTheme(nextTheme);
-    setReady(true);
-  }, []);
+    applyTheme(theme);
+  }, [theme]);
 
   function handleToggle() {
     const nextTheme: ThemeMode = theme === "light" ? "dark" : "light";
-    applyTheme(nextTheme);
     window.localStorage.setItem("senda-theme", nextTheme);
-    setTheme(nextTheme);
+    window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
   }
 
   return (

@@ -23,13 +23,13 @@ contexto del proyecto para discutir ideas — las ideas accionables se convierte
 - **PostgreSQL 16** local (instalado como servicio de Windows, no Docker) +
   **Prisma 7** como ORM (no Sequelize, por tipado end-to-end y mejor soporte en el
   ecosistema Next.js/IA).
-- Deploy pensado (no implementado aún): EC2 + PM2 + nginx + CloudFront/ACM/Route53,
-  mismo patrón que ya usa Ramiro con Express en otros proyectos. Ver decisions.md.
+- Deploy actual: EC2 + PM2 + Nginx + Certbot en `senda.prismadevs.com`. CloudFront y
+  health checks formales siguen pendientes. Ver [deploy-ec2.md](./deploy-ec2.md).
 
-## Estado actual — Bloque 1 (auth & multi-tenancy) cerrado ✅
-Repo sin commitear todavía (hay un commit inicial de `create-next-app`, todo lo
-demás — docs, schema, auth — está sin commit; no se hizo por decisión de no
-commitear sin que Ramiro lo pida explícitamente).
+## Estado actual
+Los bloques 0 a 4 están implementados. El bloque 5 tiene un assistant funcional con
+OpenAI, contexto persistente y búsqueda léxica de repos permitidos; no usa embeddings,
+pgvector ni streaming. El deploy actual está en el commit que figura en `main`.
 
 Implementado y probado end-to-end (con curl, manualmente):
 - Modelos Prisma: `User`, `Project`, `ProjectMember`, `Milestone`, `ActivityLog`,
@@ -78,8 +78,8 @@ Implementado y probado end-to-end (con curl, manualmente):
   Si algo no conecta, chequear con `Test-NetConnection -ComputerName localhost -Port 5432`
   antes de asumir que Postgres está caído.
 
-## Próximo paso: Bloque 2
-CRUD de proyectos desde el panel admin — crear proyecto, invitar cliente (alta de
-`User` + `ProjectMember`), cargar fase/avance/milestones/activity log a mano. Es
-prerrequisito del Bloque 3 (dashboard del cliente) porque hoy no hay forma de cargar
-data real sin tocar la DB a mano. Detalle en [roadmap.md](./roadmap.md).
+## Próximos pasos
+- Completar notificaciones, recuperación de contraseña, registro real y adjuntos.
+- Evolucionar el assistant a RAG semántico con embeddings/pgvector si el volumen de
+  contexto lo justifica.
+- Añadir pruebas automatizadas y health checks de despliegue.

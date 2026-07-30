@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireProjectMember } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { consumeRateLimit } from "@/lib/rate-limit";
+
+const MAX_MESSAGE_LENGTH = 4_000;
 
 function serializeMessage(message: {
   id: string;
@@ -77,7 +80,25 @@ export async function POST(request: Request) {
     );
   }
 
+  if (projectId.length > 128 || messageBody.length > MAX_MESSAGE_LENGTH) {
+    return NextResponse.json(
+      { error: "El mensaje supera el máximo de 4000 caracteres." },
+      { status: 400 },
+    );
+  }
+
   const user = await requireProjectMember(projectId);
+  const rateLimit = consumeRateLimit({
+    key: `chat:${user.id}:${projectId}`,
+    limit: 30,
+    windowMs: 60 * 1000,
+  });
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Demasiados mensajes. Esperá un momento antes de continuar." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
+    );
+  }
 
   const message = await prisma.message.create({
     data: {
