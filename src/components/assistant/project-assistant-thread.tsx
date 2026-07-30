@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 
 type AssistantItem = {
   id: string;
@@ -43,6 +49,21 @@ export function ProjectAssistantThread({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [proposal, setProposal] = useState<ProposalInfo>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useLayoutEffect(() => {
+    const element = textareaRef.current;
+    if (!element) return;
+    element.style.height = "0px";
+    element.style.height = `${Math.min(element.scrollHeight, 144)}px`;
+  }, [message]);
+
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    container.scrollTop = container.scrollHeight;
+  }, [history, isSubmitting]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -116,33 +137,44 @@ export function ProjectAssistantThread({
     setProposal(data.proposal ?? null);
   }
 
+  const quickPrompts = [
+    "Resumime el estado actual",
+    "Que se hizo esta semana",
+    "Que sigue ahora",
+  ];
+
   return (
-    <main className="flex h-[calc(100vh-6.9rem)] min-h-[520px] flex-col">
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
+    <main className="flex h-[calc(100dvh-5.55rem)] min-h-[520px] flex-col">
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white/94 shadow-sm">
         <header className="border-b border-zinc-200 px-4 py-2">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold tracking-tight text-zinc-950">
-              AI Assistant
-            </h2>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                Assistant
+              </p>
+              <p className="text-sm font-medium text-zinc-900">
+                Contexto, explicaciones y seguimiento
+              </p>
+            </div>
             <div className="flex flex-wrap items-center gap-2 text-[11px]">
               <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700">
                 {history.length} items
               </span>
               <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700">
-                {projectId}
+                Repo activo
               </span>
             </div>
           </div>
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col bg-zinc-100/45">
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
             {history.length === 0 ? (
               <div className="flex h-full min-h-[260px] items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-white/70 px-6 text-sm text-zinc-500">
                 Todavia no hay conversacion con el assistant.
               </div>
             ) : (
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {history.map((item) => {
                   const own = item.role === "user";
 
@@ -152,7 +184,7 @@ export function ProjectAssistantThread({
                       className={`flex ${own ? "justify-end" : "justify-start"}`}
                     >
                       <article
-                        className={`max-w-[780px] rounded-xl border px-4 py-2.5 shadow-sm ${
+                        className={`max-w-[720px] rounded-2xl border px-4 py-3 shadow-sm ${
                           own
                             ? "border-zinc-950 bg-zinc-950 text-white"
                             : "border-sky-200 bg-sky-50 text-zinc-900"
@@ -178,29 +210,15 @@ export function ProjectAssistantThread({
                         {!own && item.isPending ? (
                           <div className="mt-2 flex items-center gap-1.5 text-[11px] text-sky-700">
                             <span className="inline-block h-1.5 w-1.5 rounded-full bg-sky-500" />
-                            <span>Analizando contexto del proyecto...</span>
+                            <span>Analizando contexto del proyecto y del repo...</span>
                           </div>
                         ) : null}
                         {!own && item.sourceFiles && item.sourceFiles.length > 0 ? (
-                          <div className="mt-3 space-y-2 border-t border-sky-200 pt-2.5">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-800">
-                              Archivos consultados
+                          <div className="mt-3 border-t border-sky-200 pt-2">
+                            <p className="text-[11px] text-sky-800/80">
+                              Nota: se consultaron {item.sourceFiles.length} archivos del repo
+                              para responder.
                             </p>
-                            <div className="space-y-2">
-                              {item.sourceFiles.map((source) => (
-                                <div
-                                  key={`${item.id}-${source.path}`}
-                                  className="rounded-md border border-sky-200 bg-white/80 px-3 py-2"
-                                >
-                                  <p className="truncate text-[11px] font-medium text-sky-900">
-                                    {source.path}
-                                  </p>
-                                  <p className="mt-1 whitespace-pre-wrap text-[11px] leading-5 text-zinc-700">
-                                    {source.excerpt}
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
                           </div>
                         ) : null}
                       </article>
@@ -211,33 +229,59 @@ export function ProjectAssistantThread({
             )}
           </div>
 
-          <div className="border-t border-zinc-200 bg-white px-4 py-2">
+          <div className="border-t border-zinc-200 bg-white/96 px-4 py-3">
             <form onSubmit={handleSubmit} className="space-y-2">
-              <textarea
-                value={message}
-                onChange={(event) => setMessage(event.target.value)}
-                rows={2}
-                required
-                placeholder="Pregunta estado, decisiones, markup, integraciones o cambios concretos..."
-                className="h-16 w-full resize-none rounded-xl border border-zinc-300 bg-[var(--surface)] px-3 py-2 text-sm leading-6 text-zinc-900 outline-none placeholder:text-zinc-500"
-              />
+              <div className="flex flex-wrap gap-2">
+                {quickPrompts.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => setMessage(prompt)}
+                    className="rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1.5 text-[11px] font-medium text-zinc-700 transition-colors hover:bg-zinc-200"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
 
-              {proposal ? (
-                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                  Propuesta creada: {proposal.title}
-                </p>
-              ) : null}
+              <div className="rounded-2xl border border-zinc-300 bg-[var(--surface)] px-3 py-2.5 shadow-sm focus-within:border-zinc-400">
+                <div className="mb-2 flex items-center justify-between gap-3 text-[11px]">
+                  <p className="text-zinc-500">Pregunta estado, decisiones, integraciones o cambios.</p>
+                  <p className="rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700">
+                    AI
+                  </p>
+                </div>
 
-              {error ? <p className="text-sm text-red-600">{error}</p> : null}
+                <textarea
+                  ref={textareaRef}
+                  value={message}
+                  onChange={(event) => setMessage(event.target.value)}
+                  rows={1}
+                  required
+                  placeholder="Escribi tu pregunta..."
+                  className="min-h-[42px] max-h-36 w-full resize-none bg-transparent text-sm leading-6 text-zinc-900 outline-none placeholder:text-zinc-500"
+                />
 
-              <div className="flex items-center justify-end border-t border-zinc-200 pt-2">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="inline-flex h-8 items-center justify-center rounded-lg bg-zinc-950 px-3.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isSubmitting ? "Consultando..." : "Consultar"}
-                </button>
+                {proposal ? (
+                  <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    Propuesta creada: {proposal.title}
+                  </p>
+                ) : null}
+
+                {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+
+                <div className="mt-2 flex items-center justify-between gap-3 border-t border-zinc-200 pt-2">
+                  <p className="text-[11px] text-zinc-500">
+                    Respuesta breve por defecto, con contexto del proyecto cuando haga falta.
+                  </p>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="inline-flex h-9 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSubmitting ? "Consultando..." : "Consultar"}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

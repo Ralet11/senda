@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 
 type ChatMessage = {
   id: string;
@@ -71,10 +78,25 @@ export function ProjectChatThread({
   const [body, setBody] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     setMessages(initialMessages);
   }, [initialMessages]);
+
+  useLayoutEffect(() => {
+    const element = textareaRef.current;
+    if (!element) return;
+    element.style.height = "0px";
+    element.style.height = `${Math.min(element.scrollHeight, 144)}px`;
+  }, [body]);
+
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    container.scrollTop = container.scrollHeight;
+  }, [messages, isSubmitting]);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,31 +156,38 @@ export function ProjectChatThread({
   }
 
   return (
-    <main className="flex h-[calc(100vh-6.9rem)] min-h-[520px] flex-col">
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
+    <main className="flex h-[calc(100dvh-5.55rem)] min-h-[520px] flex-col">
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white/94 shadow-sm">
         <header className="border-b border-zinc-200 px-4 py-2">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold tracking-tight text-zinc-950">Chat</h2>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                Conversacion
+              </p>
+              <p className="text-sm font-medium text-zinc-900">
+                Canal compartido con el equipo
+              </p>
+            </div>
 
             <div className="flex flex-wrap items-center gap-2 text-[11px]">
               <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700">
                 {orderedMessages.length} mensajes
               </span>
               <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700">
-                {projectId}
+                Sync 5s
               </span>
             </div>
           </div>
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col bg-zinc-100/45">
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <div className="flex min-h-0 flex-1 flex-col bg-zinc-100/40">
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
             {orderedMessages.length === 0 ? (
               <div className="flex h-full min-h-[260px] items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-white/70 px-6 text-sm text-zinc-500">
-                Todavía no hay mensajes en este proyecto.
+                Todavia no hay mensajes en este proyecto.
               </div>
             ) : (
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {orderedMessages.map((message) => {
                   const own = isOwnMessage(message, currentUser.id);
                   const authorName = getAuthorName(message);
@@ -170,11 +199,11 @@ export function ProjectChatThread({
                   return (
                     <div
                       key={message.id}
-                      className={`flex items-end gap-3 ${own ? "justify-end" : "justify-start"}`}
+                      className={`flex items-end gap-2 ${own ? "justify-end" : "justify-start"}`}
                     >
                       {!own ? (
                         <div
-                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
+                          className={`mb-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${
                             message.isFromAssistant
                               ? "border border-sky-200 bg-sky-50 text-sky-800"
                               : "border border-zinc-200 bg-white text-zinc-700"
@@ -185,7 +214,7 @@ export function ProjectChatThread({
                       ) : null}
 
                       <article
-                        className={`max-w-[760px] rounded-xl border px-4 py-2.5 shadow-sm ${
+                        className={`max-w-[720px] rounded-2xl border px-4 py-3 shadow-sm ${
                           own
                             ? "border-zinc-950 bg-zinc-950 text-white"
                             : message.isFromAssistant
@@ -216,7 +245,7 @@ export function ProjectChatThread({
                       </article>
 
                       {own ? (
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-900 bg-zinc-900 text-[11px] font-semibold text-white">
+                        <div className="mb-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-zinc-900 bg-zinc-900 text-[10px] font-semibold text-white">
                           {getInitials(currentUser.name)}
                         </div>
                       ) : null}
@@ -227,32 +256,34 @@ export function ProjectChatThread({
             )}
           </div>
 
-          <div className="border-t border-zinc-200 bg-white px-4 py-2">
+          <div className="border-t border-zinc-200 bg-white/96 px-4 py-3">
             <form onSubmit={handleSubmit} className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <p className="min-w-0 truncate text-sm font-medium text-zinc-900">
-                  {currentUser.name}
-                </p>
-                <div className="shrink-0 rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-700">
-                  {currentUser.globalRole}
+              <div className="rounded-2xl border border-zinc-300 bg-[var(--surface)] px-3 py-2.5 shadow-sm focus-within:border-zinc-400">
+                <div className="mb-2 flex items-center justify-between gap-3 text-[11px]">
+                  <p className="min-w-0 truncate font-medium text-zinc-800">{currentUser.name}</p>
+                  <div className="shrink-0 rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700">
+                    {currentUser.globalRole}
+                  </div>
                 </div>
-              </div>
 
-              <div className="rounded-xl border border-zinc-300 bg-[var(--surface)] px-3 py-2 focus-within:border-zinc-400">
                 <textarea
+                  ref={textareaRef}
                   value={body}
                   onChange={(event) => setBody(event.target.value)}
                   rows={1}
                   required
-                  placeholder="Escribí tu consulta o actualización..."
-                  className="h-9 w-full resize-none bg-transparent text-sm leading-6 text-zinc-900 outline-none placeholder:text-zinc-500"
+                  placeholder="Escribi una consulta o actualizacion para el equipo..."
+                  className="min-h-[42px] max-h-36 w-full resize-none bg-transparent text-sm leading-6 text-zinc-900 outline-none placeholder:text-zinc-500"
                 />
 
-                <div className="mt-2 flex items-center justify-end border-t border-zinc-200 pt-2">
+                <div className="mt-2 flex items-center justify-between gap-3 border-t border-zinc-200 pt-2">
+                  <p className="text-[11px] text-zinc-500">
+                    Visible para todos los miembros del proyecto
+                  </p>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="inline-flex h-8 items-center justify-center rounded-lg bg-zinc-950 px-3.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-9 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSubmitting ? "Enviando..." : "Enviar"}
                   </button>

@@ -124,6 +124,45 @@ function isCodeQuestion(message: string) {
   return patterns.some((pattern) => normalized.includes(pattern));
 }
 
+function shouldSearchRepoContext(input: {
+  message: string;
+  projectName: string;
+}) {
+  const normalized = input.message.toLowerCase();
+  const normalizedProjectName = input.projectName.toLowerCase();
+
+  if (isCodeQuestion(input.message)) {
+    return true;
+  }
+
+  const productQuestionPatterns = [
+    "que es",
+    "qué es",
+    "de que se trata",
+    "de qué se trata",
+    "que hace",
+    "qué hace",
+    "para que sirve",
+    "para qué sirve",
+    "como funciona",
+    "cómo funciona",
+    "stack",
+    "arquitectura",
+    "modulos",
+    "módulos",
+  ];
+
+  if (productQuestionPatterns.some((pattern) => normalized.includes(pattern))) {
+    return true;
+  }
+
+  if (!normalizedProjectName) {
+    return false;
+  }
+
+  return normalized.includes(normalizedProjectName);
+}
+
 function buildProposalTitle(message: string) {
   const trimmed = message.trim().replace(/\s+/g, " ");
   const sentence = trimmed.split(/[.!?]/)[0] || trimmed;
@@ -335,7 +374,10 @@ export async function createAssistantReply(projectId: string, message: string) {
 
   const title = buildProposalTitle(message);
   const shouldCreateProposal = detectActionableRequest(message);
-  const repoContext = isCodeQuestion(message)
+  const repoContext = shouldSearchRepoContext({
+    message,
+    projectName: project.name,
+  })
     ? await searchProjectRepo({
         repoLocalPath: project.repoLocalPath,
         question: message,
