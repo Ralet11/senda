@@ -189,17 +189,42 @@ Validar:
 
 ## 11. Flujo de actualizacion de codigo
 
-Cuando quieras actualizar:
+El unico metodo permitido para actualizar Senda es el script versionado. No ejecutar
+manualmente `npm ci`, builds, migraciones o reinicios de PM2 en el EC2: en una
+instancia pequena esos pasos pueden dejar `node_modules` a medio instalar si se
+interrumpen.
+
+Antes de publicar, desde un checkout local limpio:
+
+```bash
+npm run lint
+npm run build
+git push origin main
+```
+
+Luego, en el EC2 como `ubuntu`:
 
 ```bash
 cd /home/ubuntu/apps/senda/current
-git pull origin main
-npm ci
-npx prisma generate
-npx prisma migrate deploy
-npm run build
-pm2 restart senda
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh
 ```
+
+El script verifica que el checkout este limpio, crea un backup de `.next` y
+`node_modules`, hace `git merge --ff-only`, instala dependencias, genera Prisma,
+aplica migraciones, compila y solo entonces reinicia el proceso PM2 `senda`.
+Tambien ejecuta un smoke test local de `/login`. Si alguna etapa falla, restaura el
+commit, dependencias y build anteriores, y reinicia exclusivamente Senda.
+
+Los backups se conservan en `/home/ubuntu/apps/senda/backups/`; no borrarlos hasta
+haber confirmado el deploy. El script no toca Nginx, PostgreSQL ni otras apps.
+
+### Recuperacion ante host saturado
+
+La instancia actual tiene recursos limitados. Si SSH/HTTPS dejan de responder durante
+un build, no iniciar una segunda instalacion ni reiniciar PM2 a ciegas. Esperar a que
+el host se recupere o revisar el estado desde AWS. Tras un reboot, verificar primero
+que `node_modules/.bin/next` exista antes de iniciar Senda.
 
 ## 12. Comando de smoke test del endpoint externo
 
