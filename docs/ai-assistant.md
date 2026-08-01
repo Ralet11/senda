@@ -20,6 +20,19 @@ Los vectores se guardan en `ProjectContextChunk.embedding` usando `text-embeddin
 
 Los nuevos mensajes del assistant se embeben automáticamente. Si esa llamada a OpenAI falla, el mensaje se conserva y una reindexación posterior lo recupera.
 
+## Investigacion de implementacion
+
+Para preguntas sobre como funciona el producto, el assistant puede contrastar la respuesta con el repositorio local enlazado al proyecto. No indexa ni expone codigo: usa una investigacion acotada y de solo lectura.
+
+El flujo tiene dos etapas:
+
+1. Busca archivos relevantes y sigue un conjunto pequeno de dependencias locales.
+2. Un analista interno transforma esa evidencia en hallazgos funcionales; el chat del cliente recibe solamente esos hallazgos, nunca excerpts, rutas, codigo ni detalles de infraestructura.
+
+La lectura esta limitada a 250 archivos candidatos, 8 piezas de evidencia y archivos de hasta 256 KB. Excluye directorios generados, dependencias, Git, archivos `.env`, claves, certificados, credenciales y respaldos. Las respuestas tecnicas deben indicar limites cuando no haya evidencia suficiente; el assistant no debe prometer una verificacion que no realizo.
+
+Para habilitarlo en un entorno, `PROJECT_REPOS_ROOT` debe apuntar al directorio padre controlado que contiene los repositorios. `Project.repoLocalPath` siempre se resuelve dentro de ese directorio; una ruta que intente salir de el se rechaza.
+
 ## Alcance inicial
 
-El índice es manual y cubre datos de Senda en PostgreSQL. La búsqueda léxica del repo sigue siendo un complemento para preguntas técnicas; no se indexa código ni archivos de repositorios externos en esta etapa.
+El indice semantico es manual y cubre datos de Senda en PostgreSQL. La investigacion del repositorio es un complemento de solo lectura para preguntas tecnicas: no crea un indice de codigo ni permite acceder a repositorios externos fuera de la raiz configurada.

@@ -36,6 +36,9 @@ yarn-error.log*
 .env*
 !.env.example
 
+# Credenciales locales de prueba; nunca versionar.
+/accesos.txt
+
 # vercel
 .vercel
 

@@ -14,10 +14,7 @@ type AssistantItem = {
   content: string;
   createdAt: string;
   isPending?: boolean;
-  sourceFiles?: Array<{
-    path: string;
-    excerpt: string;
-  }>;
+  research?: { used: boolean; evidenceCount: number };
 };
 
 type ProposalInfo = {
@@ -83,7 +80,7 @@ export function ProjectAssistantThread({
       content: "Pensando...",
       createdAt: new Date().toISOString(),
       isPending: true,
-      sourceFiles: [],
+      research: { used: false, evidenceCount: 0 },
     };
 
     setIsSubmitting(true);
@@ -210,14 +207,13 @@ export function ProjectAssistantThread({
                         {!own && item.isPending ? (
                           <div className="mt-2 flex items-center gap-1.5 text-[11px] text-sky-700">
                             <span className="inline-block h-1.5 w-1.5 rounded-full bg-sky-500" />
-                            <span>Analizando contexto del proyecto y del repo...</span>
+                            <span>Analizando el contexto del proyecto...</span>
                           </div>
                         ) : null}
-                        {!own && item.sourceFiles && item.sourceFiles.length > 0 ? (
+                        {!own && item.research?.used ? (
                           <div className="mt-3 border-t border-sky-200 pt-2">
                             <p className="text-[11px] text-sky-800/80">
-                              Nota: se consultaron {item.sourceFiles.length} archivos del repo
-                              para responder.
+                              Respuesta contrastada con la implementaciÃ³n actual.
                             </p>
                           </div>
                         ) : null}
