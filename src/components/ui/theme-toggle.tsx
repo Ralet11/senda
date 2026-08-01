@@ -50,7 +50,7 @@ export function ThemeToggle() {
       type="button"
       onClick={handleToggle}
       disabled={!ready}
-      className="fixed right-4 top-4 z-50 inline-flex h-10 items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-800 shadow-sm backdrop-blur disabled:opacity-60 lg:right-6 lg:top-6"
+      className="fixed bottom-4 right-4 z-50 inline-flex h-10 items-center gap-2 rounded-xl border border-zinc-300 bg-white/95 px-3 text-sm font-medium text-zinc-800 shadow-lg backdrop-blur disabled:opacity-60 lg:bottom-6 lg:right-6"
       aria-label={theme === "light" ? "Cambiar a modo oscuro" : "Cambiar a modo claro"}
     >
       <span aria-hidden="true">{theme === "light" ? "◐" : "◑"}</span>

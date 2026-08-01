@@ -12,7 +12,7 @@ export function LogoutButton() {
   }
 
   return (
-    <button onClick={handleLogout} className="rounded border px-3 py-1 text-sm">
+    <button onClick={handleLogout} className="rounded-lg border bg-white px-3 py-2 text-xs font-medium text-zinc-700 transition hover:bg-zinc-100">
       Cerrar sesión
     </button>
   );
