@@ -181,7 +181,7 @@ export function ProjectAssistantThread({
                       className={`flex ${own ? "justify-end" : "justify-start"}`}
                     >
                       <article
-                        className={`max-w-[720px] rounded-2xl border px-4 py-3 shadow-sm ${
+                        className={`max-w-[92%] lg:max-w-[88%] rounded-2xl border px-4 py-3 shadow-sm ${
                           own
                             ? "border-zinc-950 bg-zinc-950 text-white"
                             : "border-sky-200 bg-sky-50 text-zinc-900"
