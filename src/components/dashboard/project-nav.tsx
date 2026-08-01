@@ -14,7 +14,7 @@ export function ProjectNav({ items }: { items: ProjectNavItem[] }) {
   return (
     <nav className="flex flex-wrap items-center gap-1">
       {items.map((item) => {
-        const active = pathname === item.href;
+        const active = pathname === item.href || (item.href.endsWith("/chat") && pathname.endsWith("/assistant"));
 
         return (
           <Link

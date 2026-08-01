@@ -22,8 +22,7 @@ export default async function ProjectLayout({
 
   const navItems = [
     { href: `/projects/${projectId}`, label: "Resumen" },
-    { href: `/projects/${projectId}/chat`, label: "Chat" },
-    { href: `/projects/${projectId}/assistant`, label: "AI Assistant" },
+    { href: `/projects/${projectId}/chat`, label: "Conversaciones" },
   ];
 
   return (

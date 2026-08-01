@@ -141,7 +141,7 @@ export function ProjectAssistantThread({
   ];
 
   return (
-    <main className="flex h-[calc(100dvh-5.55rem)] min-h-[520px] flex-col">
+    <main className="flex h-[calc(100dvh-12rem)] min-h-[520px] flex-col">
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.35rem] border border-zinc-200 bg-white/94 shadow-sm">
         <header className="border-b border-zinc-200 bg-gradient-to-r from-white to-teal-50/60 px-5 py-4">
           <div className="flex items-center justify-between gap-3">

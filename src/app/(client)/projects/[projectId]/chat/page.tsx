@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { ProjectChatThread } from "@/components/chat/project-chat-thread";
+import { ConversationFrame } from "@/components/conversation/conversation-frame";
 import { requireProjectMember } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -65,7 +66,7 @@ export default async function ProjectChatPage({
   }
 
   return (
-    <ProjectChatThread
+    <ConversationFrame projectId={projectId} active="team"><ProjectChatThread
       projectId={projectId}
       currentUser={{
         id: user.id,
@@ -74,6 +75,6 @@ export default async function ProjectChatPage({
         globalRole: user.globalRole,
       }}
       initialMessages={messages.map(serializeMessage)}
-    />
+    /></ConversationFrame>
   );
 }
