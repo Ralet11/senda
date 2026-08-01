@@ -252,9 +252,9 @@ export function ProjectChatThread({
             )}
           </div>
 
-          <div className="border-t border-zinc-200 bg-white/96 px-5 py-4">
+          <div className="border-t border-zinc-200 bg-white/96 px-4 py-3">
             <form onSubmit={handleSubmit} className="space-y-2">
-              <div className="rounded-2xl border border-zinc-300 bg-[var(--surface)] px-3 py-2.5 shadow-sm focus-within:border-zinc-400">
+              <div className="rounded-xl border border-zinc-300 bg-[var(--surface)] px-3 py-2 shadow-sm focus-within:border-zinc-400">
                 <div className="mb-2 flex items-center justify-between gap-3 text-[11px]">
                   <p className="min-w-0 truncate font-medium text-zinc-800">{currentUser.name}</p>
                   <div className="shrink-0 rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700">
@@ -269,17 +269,17 @@ export function ProjectChatThread({
                   rows={1}
                   required
                   placeholder="Escribi una consulta o actualizacion para el equipo..."
-                  className="min-h-[42px] max-h-36 w-full resize-none bg-transparent text-sm leading-6 text-zinc-900 outline-none placeholder:text-zinc-500"
+                  className="min-h-[32px] max-h-28 w-full resize-none bg-transparent py-1 text-sm leading-5 text-zinc-900 outline-none placeholder:text-zinc-500"
                 />
 
-                <div className="mt-2 flex items-center justify-between gap-3 border-t border-zinc-200 pt-2">
+                <div className="mt-1.5 flex items-center justify-between gap-3 border-t border-zinc-200 pt-1.5">
                   <p className="text-[11px] text-zinc-500">
                     Visible para todos los miembros del proyecto
                   </p>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="inline-flex h-9 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-8 items-center justify-center rounded-lg bg-zinc-950 px-3 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSubmitting ? "Enviando..." : "Enviar"}
                   </button>
