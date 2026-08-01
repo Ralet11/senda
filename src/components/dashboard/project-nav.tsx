@@ -12,7 +12,7 @@ export function ProjectNav({ items }: { items: ProjectNavItem[] }) {
   const pathname = usePathname();
 
   return (
-    <nav className="mt-4 space-y-1">
+    <nav className="mt-6 space-y-1 px-1">
       {items.map((item) => {
         const active = pathname === item.href;
 
@@ -20,12 +20,13 @@ export function ProjectNav({ items }: { items: ProjectNavItem[] }) {
           <Link
             key={item.href}
             href={item.href}
-            className={`flex items-center rounded-md px-3 py-2 text-sm ${
+            className={`senda-nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${
               active
-                ? "bg-zinc-950 font-medium text-white"
+                ? "bg-[var(--navy)] font-medium text-white shadow-sm"
                 : "text-zinc-700 hover:bg-zinc-100"
             }`}
           >
+            <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-[#61ddcf]" : "bg-zinc-300"}`} />
             {item.label}
           </Link>
         );

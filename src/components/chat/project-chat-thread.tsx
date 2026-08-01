@@ -153,15 +153,15 @@ export function ProjectChatThread({
 
   return (
     <main className="flex h-[calc(100dvh-5.55rem)] min-h-[520px] flex-col">
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white/94 shadow-sm">
-        <header className="border-b border-zinc-200 px-4 py-2">
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.35rem] border border-zinc-200 bg-white/94 shadow-sm">
+        <header className="border-b border-zinc-200 bg-gradient-to-r from-white to-teal-50/60 px-5 py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                Conversacion
+                Conversación
               </p>
               <p className="text-sm font-medium text-zinc-900">
-                Canal compartido con el equipo
+                Conversá directamente con el equipo Senda
               </p>
             </div>
 
@@ -169,8 +169,8 @@ export function ProjectChatThread({
               <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700">
                 {orderedMessages.length} mensajes
               </span>
-              <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700">
-                Sync 5s
+              <span className="rounded-full bg-[var(--brand-soft)] px-2.5 py-1 font-medium text-[var(--brand-strong)]">
+                Actualizado
               </span>
             </div>
           </div>
@@ -252,7 +252,7 @@ export function ProjectChatThread({
             )}
           </div>
 
-          <div className="border-t border-zinc-200 bg-white/96 px-4 py-3">
+          <div className="border-t border-zinc-200 bg-white/96 px-5 py-4">
             <form onSubmit={handleSubmit} className="space-y-2">
               <div className="rounded-2xl border border-zinc-300 bg-[var(--surface)] px-3 py-2.5 shadow-sm focus-within:border-zinc-400">
                 <div className="mb-2 flex items-center justify-between gap-3 text-[11px]">

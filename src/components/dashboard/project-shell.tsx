@@ -2,18 +2,8 @@ import Link from "next/link";
 import { LogoutButton } from "@/components/ui/logout-button";
 import { ProjectNav } from "@/components/dashboard/project-nav";
 
-type ProjectNavItem = {
-  href: string;
-  label: string;
-};
-
-type ProjectSummary = {
-  id: string;
-  name: string;
-  phase: string;
-  progress: number;
-};
-
+type ProjectNavItem = { href: string; label: string };
+type ProjectSummary = { id: string; name: string; phase: string; progress: number };
 type ProjectShellProps = {
   currentProjectId: string;
   currentProjectName: string;
@@ -23,117 +13,35 @@ type ProjectShellProps = {
 };
 
 function formatPhase(phase: string) {
-  switch (phase) {
-    case "DISCOVERY":
-      return "Discovery";
-    case "DESIGN":
-      return "Diseno";
-    case "DEVELOPMENT":
-      return "Desarrollo";
-    case "QA":
-      return "QA";
-    case "LAUNCHED":
-      return "Lanzado";
-    default:
-      return phase;
-  }
+  return ({ DISCOVERY: "Discovery", DESIGN: "Diseño", DEVELOPMENT: "Desarrollo", QA: "Calidad", LAUNCHED: "Lanzado" } as Record<string, string>)[phase] ?? phase;
 }
 
-export function ProjectShell({
-  currentProjectId,
-  currentProjectName,
-  navItems,
-  projects,
-  children,
-}: ProjectShellProps) {
+export function ProjectShell({ currentProjectId, currentProjectName, navItems, projects, children }: ProjectShellProps) {
+  const current = projects.find((project) => project.id === currentProjectId);
   return (
-    <div className="min-h-screen bg-zinc-50">
-      <div className="mx-auto grid min-h-screen w-full max-w-[1440px] gap-3 px-3 py-2 lg:grid-cols-[228px_minmax(0,1fr)] lg:px-4">
-        <aside className="flex min-h-[calc(100vh-1rem)] flex-col rounded-lg border border-zinc-200 bg-white/92 p-3 shadow-sm">
-          <div className="border-b border-zinc-200 pb-2.5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-              Senda
-            </p>
-            <h1 className="mt-1.5 text-[15px] font-semibold text-zinc-950">Portal cliente</h1>
-            <p className="mt-1 text-[13px] leading-5 text-zinc-600">
-              Seguimiento, contexto y comunicacion del proyecto.
-            </p>
+    <div className="senda-shell min-h-screen">
+      <div className="mx-auto grid min-h-screen w-full max-w-[1600px] gap-4 px-3 py-3 lg:grid-cols-[248px_minmax(0,1fr)] lg:px-5 lg:py-5">
+        <aside className="senda-sidebar flex flex-col rounded-[1.35rem] border p-4 shadow-sm">
+          <Link href={`/projects/${currentProjectId}`} className="flex items-center gap-3 px-2 py-2">
+            <span className="senda-brand-mark flex h-9 w-9 items-center justify-center rounded-xl text-lg font-bold text-white">S</span>
+            <span><strong className="block text-[15px] tracking-tight text-zinc-950">senda</strong><small className="block text-[11px] text-zinc-500">project clarity</small></span>
+          </Link>
+
+          <div className="mt-6 px-2"><p className="text-[10px] font-bold uppercase tracking-[.18em] text-zinc-500">Proyecto activo</p></div>
+          <div className="mt-2 rounded-2xl bg-zinc-100 px-3 py-3">
+            <p className="line-clamp-2 text-sm font-semibold text-zinc-950">{currentProjectName}</p>
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-[var(--brand)]" style={{ width: `${current?.progress ?? 0}%` }} /></div>
+            <p className="mt-2 text-xs text-zinc-600">{formatPhase(current?.phase ?? "DISCOVERY")} · {current?.progress ?? 0}%</p>
           </div>
 
-          <div className="mt-3 space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              Proyecto actual
-            </p>
-            <div className="rounded-md border border-zinc-200 bg-zinc-100 px-3 py-2.5">
-              <p className="line-clamp-2 text-sm font-medium text-zinc-950">
-                {currentProjectName}
-              </p>
-              <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-zinc-600">
-                <span>ID</span>
-                <span className="max-w-[140px] truncate font-mono">{currentProjectId}</span>
-              </div>
-            </div>
-          </div>
+          <ProjectNav items={navItems} />
 
-          <div className="mt-3">
-            <ProjectNav items={navItems} />
-          </div>
-
-          <div className="mt-4 flex-1 space-y-2 border-t border-zinc-200 pt-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              Mis proyectos
-            </p>
-            <div className="space-y-2">
-              {projects.map((project) => (
-                <Link
-                  key={project.id}
-                  href={`/projects/${project.id}`}
-                  className={`block rounded-md border px-3 py-2.5 transition-colors ${
-                    project.id === currentProjectId
-                      ? "border-zinc-950 bg-zinc-950 text-white"
-                      : "border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-100"
-                  }`}
-                >
-                  <p className="line-clamp-2 text-sm font-medium">{project.name}</p>
-                  <div
-                    className={`mt-1.5 flex items-center justify-between text-[11px] ${
-                      project.id === currentProjectId ? "text-zinc-300" : "text-zinc-500"
-                    }`}
-                  >
-                    <span>{formatPhase(project.phase)}</span>
-                    <span>{project.progress}%</span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-4 border-t border-zinc-200 pt-3">
-            <LogoutButton />
-          </div>
+          {projects.length > 1 ? <div className="mt-7 border-t pt-5"><p className="px-2 text-[10px] font-bold uppercase tracking-[.18em] text-zinc-500">Tus proyectos</p><div className="mt-2 space-y-1">{projects.filter((project) => project.id !== currentProjectId).map((project) => <Link key={project.id} href={`/projects/${project.id}`} className="block rounded-xl px-3 py-2.5 text-sm text-zinc-700 transition hover:bg-zinc-100"><span className="block truncate font-medium">{project.name}</span><span className="text-xs text-zinc-500">{project.progress}% completado</span></Link>)}</div></div> : null}
+          <div className="mt-auto border-t pt-4"><LogoutButton /></div>
         </aside>
 
-        <div className="min-w-0">
-          <div className="mb-3 rounded-lg border border-zinc-200 bg-white/88 px-4 py-2 shadow-sm">
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                  Proyecto
-                </p>
-                <h2 className="text-[15px] font-semibold text-zinc-950">
-                  {currentProjectName}
-                </h2>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-zinc-600">
-                <span className="rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1">
-                  {projects.length} proyecto{projects.length === 1 ? "" : "s"}
-                </span>
-                <span className="rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 font-mono">
-                  {currentProjectId}
-                </span>
-              </div>
-            </div>
-          </div>
+        <div className="min-w-0 py-1 lg:py-3">
+          <header className="mb-5 flex items-center justify-between px-2 lg:px-3"><div><p className="text-xs font-medium text-[var(--brand)]">Portal de proyecto</p><p className="mt-1 text-sm text-zinc-500">Todo lo importante, sin ruido.</p></div><div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-xs font-bold text-zinc-700">{currentProjectName.slice(0, 1).toUpperCase()}</div></header>
           {children}
         </div>
       </div>

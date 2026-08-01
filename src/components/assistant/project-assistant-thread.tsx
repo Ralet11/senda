@@ -142,15 +142,15 @@ export function ProjectAssistantThread({
 
   return (
     <main className="flex h-[calc(100dvh-5.55rem)] min-h-[520px] flex-col">
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white/94 shadow-sm">
-        <header className="border-b border-zinc-200 px-4 py-2">
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.35rem] border border-zinc-200 bg-white/94 shadow-sm">
+        <header className="border-b border-zinc-200 bg-gradient-to-r from-white to-teal-50/60 px-5 py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                Assistant
+                Senda AI
               </p>
               <p className="text-sm font-medium text-zinc-900">
-                Contexto, explicaciones y seguimiento
+                Entendé cómo avanza y funciona tu proyecto
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-[11px]">
@@ -158,7 +158,7 @@ export function ProjectAssistantThread({
                 {history.length} items
               </span>
               <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700">
-                Repo activo
+                Contexto seguro
               </span>
             </div>
           </div>
@@ -225,7 +225,7 @@ export function ProjectAssistantThread({
             )}
           </div>
 
-          <div className="border-t border-zinc-200 bg-white/96 px-4 py-3">
+          <div className="border-t border-zinc-200 bg-white/96 px-5 py-4">
             <form onSubmit={handleSubmit} className="space-y-2">
               <div className="flex flex-wrap gap-2">
                 {quickPrompts.map((prompt) => (
@@ -242,9 +242,9 @@ export function ProjectAssistantThread({
 
               <div className="rounded-2xl border border-zinc-300 bg-[var(--surface)] px-3 py-2.5 shadow-sm focus-within:border-zinc-400">
                 <div className="mb-2 flex items-center justify-between gap-3 text-[11px]">
-                  <p className="text-zinc-500">Pregunta estado, decisiones, integraciones o cambios.</p>
-                  <p className="rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700">
-                    AI
+                  <p className="text-zinc-500">Preguntá por avances, decisiones o cómo funciona algo.</p>
+                  <p className="rounded-full bg-[var(--brand-soft)] px-2.5 py-1 font-medium text-[var(--brand-strong)]">
+                    AI seguro
                   </p>
                 </div>
 
@@ -275,7 +275,7 @@ export function ProjectAssistantThread({
                     disabled={isSubmitting}
                     className="inline-flex h-9 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {isSubmitting ? "Consultando..." : "Consultar"}
+                    {isSubmitting ? "Consultando..." : "Preguntar"}
                   </button>
                 </div>
               </div>
