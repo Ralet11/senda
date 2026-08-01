@@ -141,9 +141,9 @@ export function ProjectAssistantThread({
   ];
 
   return (
-    <main className="flex h-[calc(100dvh-12rem)] min-h-[520px] flex-col">
+    <main className="flex h-full min-h-0 flex-col">
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.35rem] border border-zinc-200 bg-white/94 shadow-sm">
-        <header className="border-b border-zinc-200 bg-gradient-to-r from-white to-teal-50/60 px-5 py-4">
+        <header className="border-b border-zinc-200 bg-gradient-to-r from-white to-teal-50/60 px-4 py-2.5">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
@@ -225,9 +225,9 @@ export function ProjectAssistantThread({
             )}
           </div>
 
-          <div className="border-t border-zinc-200 bg-white/96 px-4 py-3">
+          <div className="border-t border-zinc-200 bg-white/96 px-3 py-2">
             <form onSubmit={handleSubmit} className="space-y-2">
-              <div className="flex flex-wrap gap-1.5">
+              <div className="hidden flex-wrap gap-1.5 sm:flex">
                 {quickPrompts.map((prompt) => (
                   <button
                     key={prompt}
@@ -241,7 +241,7 @@ export function ProjectAssistantThread({
               </div>
 
               <div className="rounded-xl border border-zinc-300 bg-[var(--surface)] px-3 py-2 shadow-sm focus-within:border-zinc-400">
-                <div className="flex items-center justify-between gap-3 text-[10px]">
+                <div className="hidden items-center justify-between gap-3 text-[10px]">
                   <p className="text-zinc-500">Preguntá por avances o funcionamiento.</p>
                   <p className="rounded-full bg-[var(--brand-soft)] px-2 py-0.5 font-medium text-[var(--brand-strong)]">
                     AI seguro
@@ -255,7 +255,7 @@ export function ProjectAssistantThread({
                   rows={1}
                   required
                   placeholder="Escribi tu pregunta..."
-                  className="min-h-[32px] max-h-28 w-full resize-none bg-transparent py-1 text-sm leading-5 text-zinc-900 outline-none placeholder:text-zinc-500"
+                  className="min-h-[34px] max-h-28 w-full resize-none bg-transparent py-1 text-sm leading-5 text-zinc-900 outline-none placeholder:text-zinc-500"
                 />
 
                 {proposal ? (
@@ -266,8 +266,8 @@ export function ProjectAssistantThread({
 
                 {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
 
-                <div className="mt-1.5 flex items-center justify-between gap-3 border-t border-zinc-200 pt-1.5">
-                  <p className="text-[10px] text-zinc-500">Contexto del proyecto cuando haga falta.</p>
+                <div className="mt-1 flex items-center justify-end gap-3 border-t border-zinc-200 pt-1">
+                  <p className="hidden text-[10px] text-zinc-500">Contexto del proyecto cuando haga falta.</p>
                   <button
                     type="submit"
                     disabled={isSubmitting}
