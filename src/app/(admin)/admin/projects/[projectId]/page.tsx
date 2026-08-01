@@ -9,6 +9,7 @@ import {
   createProjectUpdateAction,
   discardProjectUpdateAction,
   publishProjectUpdateAction,
+  reindexProjectContextAction,
   toggleMilestoneAction,
   updateProjectAction,
 } from "../actions";
@@ -77,6 +78,7 @@ export default async function AdminProjectDetailPage({
   const updateAction = updateProjectAction.bind(null, projectId);
   const addMilestone = addMilestoneAction.bind(null, projectId);
   const addActivity = addActivityLogAction.bind(null, projectId);
+  const reindexContext = reindexProjectContextAction.bind(null, projectId);
   const createUpdate = createProjectUpdateAction.bind(null, projectId);
   const draftUpdates = project.updates.filter((update) => update.status === "DRAFT");
   const publishedUpdates = project.updates.filter(
@@ -621,6 +623,20 @@ export default async function AdminProjectDetailPage({
                   <span className="font-medium">Ruta:</span>{" "}
                   {project.repoLocalPath || "No configurada"}
                 </p>
+              </div>
+
+              <div className="mt-4 border-t border-zinc-200 pt-4">
+                <h3 className="text-sm font-semibold text-zinc-900">Contexto semántico</h3>
+                <p className="mt-1 text-sm text-zinc-600">
+                  Genera embeddings del brief, hitos, actividad, updates publicados e historial del assistant.
+                </p>
+                <form action={reindexContext} className="mt-3">
+                  <SubmitButton
+                    idleLabel="Reindexar contexto"
+                    pendingLabel="Reindexando..."
+                    className="inline-flex h-9 items-center justify-center rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </form>
               </div>
             </div>
 

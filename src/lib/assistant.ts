@@ -1,6 +1,11 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { searchProjectRepo } from "@/lib/project-repo";
+import {
+  embedProjectContextChunks,
+  searchProjectContext,
+  type SemanticContextResult,
+} from "@/lib/project-rag";
 
 type AssistantHistoryItem = {
   id: string;
@@ -222,13 +227,33 @@ function buildRepoContextBlock(input: {
   ].join("\n");
 }
 
+function buildSemanticContextBlock(results: SemanticContextResult[]) {
+  if (results.length === 0) {
+    return "No hay contexto semántico indexado todavía para este proyecto.";
+  }
+
+  return results
+    .map(
+      (result, index) =>
+        `${index + 1}. [${result.source}] ${result.content}`,
+    )
+    .join("\n");
+}
+
 function buildSystemPrompt(input: {
   projectName: string;
   projectContext: string;
+  semanticContextBlock: string;
   repoContextBlock: string;
   createdProposal: boolean;
 }) {
-  const { projectName, projectContext, repoContextBlock, createdProposal } = input;
+  const {
+    projectName,
+    projectContext,
+    semanticContextBlock,
+    repoContextBlock,
+    createdProposal,
+  } = input;
 
   return [
     "Sos el assistant conversacional de Senda para clientes de un estudio de desarrollo.",
@@ -248,6 +273,9 @@ function buildSystemPrompt(input: {
     "",
     "Contexto del proyecto:",
     projectContext,
+    "",
+    "Contexto semántico recuperado para esta consulta:",
+    semanticContextBlock,
     "",
     "Contexto de repo disponible para esta consulta:",
     repoContextBlock,
@@ -396,7 +424,13 @@ export async function createAssistantReply(projectId: string, message: string) {
     : null;
 
   const createdProposal = shouldCreateProposal && !existingProposal;
-  const history = await getRecentConversation(projectId);
+  const [history, semanticContext] = await Promise.all([
+    getRecentConversation(projectId),
+    searchProjectContext({ projectId, question: message }).catch((error) => {
+      console.error("semantic context search failed", error);
+      return [] as SemanticContextResult[];
+    }),
+  ]);
 
   const messages: OpenAIMessage[] = [
     {
@@ -404,6 +438,7 @@ export async function createAssistantReply(projectId: string, message: string) {
       content: buildSystemPrompt({
         projectName: project.name,
         projectContext: buildProjectContextBlock(project),
+        semanticContextBlock: buildSemanticContextBlock(semanticContext),
         repoContextBlock: buildRepoContextBlock({
           repoContext,
           repoLocalPath: project.repoLocalPath,
@@ -452,6 +487,24 @@ export async function createAssistantReply(projectId: string, message: string) {
 
     return { userChunk, replyChunk, proposal };
   });
+
+  try {
+    await embedProjectContextChunks([
+      {
+        id: result.userChunk.id,
+        source: result.userChunk.source,
+        content: result.userChunk.content,
+      },
+      {
+        id: result.replyChunk.id,
+        source: result.replyChunk.source,
+        content: result.replyChunk.content,
+      },
+    ]);
+  } catch (error) {
+    // The reply is already persisted; a later manual reindex can recover this context.
+    console.error("assistant context embedding failed", error);
+  }
 
   return {
     reply: {

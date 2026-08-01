@@ -157,12 +157,17 @@ model Proposal {
 // Fragmentos de contexto (brief, docs, historial) embebidos para RAG del AI assistant.
 // El embedding se agrega vía migración manual con pgvector (ver docs/ai-assistant.md).
 model ProjectContextChunk {
-  id        String   @id @default(cuid())
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  projectId String
-  source    String // ej: "brief", "activity_log", "chat"
-  content   String
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId      String
+  source         String // ej: "brief", "activity_log", "chat"
+  content        String
+  embedding      Unsupported("vector(1536)")?
+  embeddingModel String?
+  embeddedAt     DateTime?
+  createdAt      DateTime @default(now())
+
+  @@index([projectId])
 }
 
 model ProjectUpdate {

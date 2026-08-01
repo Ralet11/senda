@@ -10,6 +10,7 @@ import type {
 import { requireAdmin } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
+import { reindexProjectContext } from "@/lib/project-rag";
 import {
   createProjectUpdate,
   isProjectPhase,
@@ -294,6 +295,27 @@ export async function addActivityLogAction(projectId: string, formData: FormData
 
   revalidatePath(`/admin/projects/${projectId}`);
   redirectWithStatus(`/admin/projects/${projectId}`, "success", "Actividad registrada.");
+}
+
+export async function reindexProjectContextAction(projectId: string) {
+  await requireAdmin();
+
+  try {
+    const result = await reindexProjectContext(projectId);
+    revalidatePath(`/admin/projects/${projectId}`);
+    redirectWithStatus(
+      `/admin/projects/${projectId}`,
+      "success",
+      `Contexto semántico reindexado: ${result.chunksIndexed} fragmentos.`,
+    );
+  } catch (error) {
+    console.error("project context reindex failed", error);
+    redirectWithStatus(
+      `/admin/projects/${projectId}`,
+      "error",
+      "No se pudo reindexar el contexto semántico. Revisá la configuración de OpenAI y volvé a intentar.",
+    );
+  }
 }
 
 export async function createProjectUpdateAction(projectId: string, formData: FormData) {
