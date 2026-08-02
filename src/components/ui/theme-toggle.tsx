@@ -47,7 +47,7 @@ export function ThemeToggle({ embedded = false, menu = false }: { embedded?: boo
     window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
   }
 
-  if (!embedded && (pathname.startsWith("/projects/") || pathname.endsWith("/chat") || pathname.endsWith("/assistant"))) return null;
+  if (!embedded && !menu && (pathname.startsWith("/projects/") || pathname.endsWith("/chat") || pathname.endsWith("/assistant"))) return null;
 
   return (
     <button
