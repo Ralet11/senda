@@ -204,6 +204,27 @@ function shouldResearchImplementation(input: {
   return normalized.includes(normalizedProjectName) && /\b(como|cÃ³mo|que|quÃ©|puede|tiene|hace)\b/.test(normalized);
 }
 
+function isRepositoryAccessQuestion(message: string) {
+  const normalized = message.toLowerCase();
+  const patterns = [
+    "puedes acceder",
+    "podes acceder",
+    "puede acceder",
+    "puedo acceder",
+    "tenes acceso",
+    "tienes acceso",
+    "tiene acceso",
+    "acceso al repo",
+    "acceso al repositorio",
+    "conexion al repo",
+    "conexión al repo",
+    "sincronizar el repo",
+    "sincronizado el repo",
+  ];
+
+  return patterns.some((pattern) => normalized.includes(pattern));
+}
+
 function buildProposalTitle(message: string) {
   const trimmed = message.trim().replace(/\s+/g, " ");
   const sentence = trimmed.split(/[.!?]/)[0] || trimmed;
@@ -359,6 +380,7 @@ function buildSystemPrompt(input: {
     "Si falta contexto para una respuesta precisa, pedi una aclaracion breve.",
     "Si te preguntan por estado, hitos, equipo, riesgos o proximos pasos, usa el contexto del proyecto.",
     "Para una pregunta sobre funcionamiento o implementacion, usa solamente la investigacion tecnica provista abajo. No prometas que vas a verificar algo en backend, codigo o configuracion: si no fue confirmado, explica ese limite o pedi una aclaracion.",
+    "Si la investigacion confirma que el repositorio esta disponible y el usuario pregunta por el acceso, confirma ese acceso de forma directa. No digas que una sincronizacion puede demorar ni pidas al cliente que confirme una configuracion que ya fue verificada.",
     "Nunca reveles ni describas codigo, archivos, rutas internas, variables de entorno, secretos, credenciales, URLs privadas, comandos ni detalles de infraestructura.",
     "Si la consulta incluye imagenes, analiza solo lo que se ve y explica el comportamiento o la interfaz en lenguaje funcional. Si aparece codigo, datos sensibles o credenciales, no los transcribas ni los reveles.",
     "No inventes datos. Si algo no esta en el contexto, decilo con claridad.",
@@ -571,15 +593,25 @@ export async function createAssistantReply(
   const shouldResearch = shouldResearchImplementation({
     message,
     projectName: project.name,
-  });
+  }) || isRepositoryAccessQuestion(message);
   const repoResearch = shouldResearch
     ? await researchProjectRepo({
         repoLocalPath: project.repoLocalPath,
         question: message,
       })
     : null;
+  const repositoryAccessQuestion = isRepositoryAccessQuestion(message);
   const technicalResearch = repoResearch
-    ? await analyzeTechnicalResearch(message, repoResearch)
+    ? repositoryAccessQuestion
+      ? {
+          attempted: true,
+          usedEvidence: false,
+          evidenceCount: 0,
+          summary: repoResearch.repoAvailable
+            ? "El repositorio configurado esta disponible para investigacion tecnica en esta consulta."
+            : repoResearch.reason || "No hay repositorio disponible.",
+        }
+      : await analyzeTechnicalResearch(message, repoResearch)
     : { attempted: false, usedEvidence: false, evidenceCount: 0, summary: "" };
 
   const createdProposal = false;
