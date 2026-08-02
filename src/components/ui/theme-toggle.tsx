@@ -28,7 +28,7 @@ function subscribeToTheme(onStoreChange: () => void) {
   };
 }
 
-export function ThemeToggle() {
+export function ThemeToggle({ embedded = false }: { embedded?: boolean }) {
   const pathname = usePathname();
   const theme = useSyncExternalStore<ThemeMode>(
     subscribeToTheme,
@@ -47,14 +47,14 @@ export function ThemeToggle() {
     window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
   }
 
-  if (pathname.endsWith("/chat") || pathname.endsWith("/assistant")) return null;
+  if (!embedded && (pathname.startsWith("/projects/") || pathname.endsWith("/chat") || pathname.endsWith("/assistant"))) return null;
 
   return (
     <button
       type="button"
       onClick={handleToggle}
       disabled={!ready}
-      className="fixed bottom-4 right-4 z-50 inline-flex h-10 items-center gap-2 rounded-xl border border-zinc-300 bg-white/95 px-3 text-sm font-medium text-zinc-800 shadow-lg backdrop-blur disabled:opacity-60 lg:bottom-6 lg:right-6"
+      className={`${embedded ? "w-full justify-center" : "fixed bottom-4 right-4 z-50 lg:bottom-6 lg:right-6"} inline-flex h-10 items-center gap-2 rounded-xl border border-zinc-300 bg-white/95 px-3 text-sm font-medium text-zinc-800 shadow-lg backdrop-blur disabled:opacity-60`}
       aria-label={theme === "light" ? "Cambiar a modo oscuro" : "Cambiar a modo claro"}
     >
       <span aria-hidden="true">{theme === "light" ? "◐" : "◑"}</span>
