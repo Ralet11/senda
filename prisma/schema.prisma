@@ -30,9 +30,17 @@ enum ProjectPhase {
 }
 
 enum ProposalStatus {
-  PENDING
+  DRAFT
+  NEEDS_CLARIFICATION
+  SUBMITTED
+  IN_REVIEW
+  RESPONSE_SENT
   ACCEPTED
-  DISCARDED
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  DECLINED
+  CANCELLED
 }
 
 enum ProjectUpdateKind {
@@ -70,6 +78,8 @@ model User {
   conversationMemberships ProjectConversationMember[]
   assistantSessions AssistantSession[]
   reviewedProposals Proposal[] @relation("ProposalReviewer")
+  createdProposals Proposal[] @relation("ProposalCreator")
+  proposalMessages ProposalMessage[]
   sessions        Session[]
   projectUpdates  ProjectUpdate[]
 }
@@ -189,6 +199,7 @@ model AssistantSession {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   contextChunks ProjectContextChunk[]
+  proposals     Proposal[]
 
   @@index([projectId, userId, updatedAt])
 }
@@ -220,11 +231,20 @@ model Proposal {
   id          String         @id @default(cuid())
   project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId   String
+  createdBy   User?          @relation("ProposalCreator", fields: [createdById], references: [id])
+  createdById String?
+  assistantSession AssistantSession? @relation(fields: [assistantSessionId], references: [id], onDelete: SetNull)
+  assistantSessionId String?
   title       String
   description String
-  status      ProposalStatus @default(PENDING)
+  summary     String?
+  openQuestions String?
+  status      ProposalStatus @default(DRAFT)
+  submittedAt DateTime?
+  resolvedAt  DateTime?
   reviewedBy  User?          @relation("ProposalReviewer", fields: [reviewedById], references: [id])
   reviewedById String?
+  messages    ProposalMessage[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 }
@@ -247,6 +267,18 @@ model ProjectContextChunk {
 
   @@index([projectId])
   @@index([assistantSessionId, createdAt])
+}
+
+model ProposalMessage {
+  id         String   @id @default(cuid())
+  proposal   Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  proposalId String
+  author     User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId   String
+  body       String
+  createdAt  DateTime @default(now())
+
+  @@index([proposalId, createdAt])
 }
 
 model ProjectUpdate {

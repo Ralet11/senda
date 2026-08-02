@@ -240,7 +240,7 @@ async function main() {
       title: "Integrar pasarela de pagos en el portal cliente",
       description:
         "El cliente quiere evaluar sumar pagos dentro del portal para la fase siguiente.",
-      status: "PENDING",
+      status: "SUBMITTED",
       reviewedById: null,
     },
     create: {
@@ -249,7 +249,7 @@ async function main() {
       title: "Integrar pasarela de pagos en el portal cliente",
       description:
         "El cliente quiere evaluar sumar pagos dentro del portal para la fase siguiente.",
-      status: "PENDING",
+      status: "SUBMITTED",
     },
   });
 

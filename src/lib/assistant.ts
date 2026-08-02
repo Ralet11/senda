@@ -566,9 +566,8 @@ export async function createAssistantReply(
   }
 
   const imageInputParts = await buildImageInputParts(input.attachments);
+  const title = message.trim().replace(/\s+/g, " ").slice(0, 72) || "Nueva conversación";
 
-  const title = buildProposalTitle(message);
-  const shouldCreateProposal = detectActionableRequest(message);
   const shouldResearch = shouldResearchImplementation({
     message,
     projectName: project.name,
@@ -583,18 +582,7 @@ export async function createAssistantReply(
     ? await analyzeTechnicalResearch(message, repoResearch)
     : { attempted: false, usedEvidence: false, evidenceCount: 0, summary: "" };
 
-  const existingProposal = shouldCreateProposal
-    ? await prisma.proposal.findFirst({
-        where: {
-          projectId,
-          status: "PENDING",
-          title,
-        },
-        select: { id: true },
-      })
-    : null;
-
-  const createdProposal = shouldCreateProposal && !existingProposal;
+  const createdProposal = false;
   const [history, semanticContext] = await Promise.all([
     getRecentConversation(projectId, assistantSessionId),
     searchProjectContext({ projectId, question: message }).catch((error) => {
@@ -682,15 +670,7 @@ export async function createAssistantReply(
       if (attached.count !== input.attachments.length) throw new Error("INVALID_ASSISTANT_ATTACHMENTS");
     }
 
-    const proposal = createdProposal
-      ? await tx.proposal.create({
-          data: {
-            projectId,
-            title,
-            description: message,
-          },
-        })
-      : null;
+    const proposal = null;
 
     await tx.assistantSession.update({
       where: { id: assistantSessionId },
@@ -750,12 +730,6 @@ export async function createAssistantReply(
         url: `/api/chat/attachments/${attachment.id}`,
       })),
     },
-    proposal: result.proposal
-      ? {
-          id: result.proposal.id,
-          title: result.proposal.title,
-          status: result.proposal.status,
-        }
-      : null,
+    proposal: null,
   };
 }

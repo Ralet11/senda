@@ -57,6 +57,7 @@ export function ProjectAssistantThread({
   const [error, setError] = useState<string | null>(null);
   const [proposal, setProposal] = useState<ProposalInfo>(null);
   const [generateVisual, setGenerateVisual] = useState(false);
+  const [isPreparingProposal, setIsPreparingProposal] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -205,6 +206,16 @@ export function ProjectAssistantThread({
     router.refresh();
   }
 
+  async function prepareProposal() {
+    setIsPreparingProposal(true);
+    setError(null);
+    const response = await fetch("/api/proposals/draft", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId, sessionId }) });
+    const data = await response.json().catch(() => null) as { proposal?: { id: string }; error?: string } | null;
+    setIsPreparingProposal(false);
+    if (!response.ok || !data?.proposal) { setError(data?.error ?? "No se pudo preparar la propuesta."); return; }
+    router.push(`/projects/${projectId}/proposals/${data.proposal.id}`);
+  }
+
   return (
     <main className="flex h-full min-h-0 flex-col">
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
@@ -225,6 +236,7 @@ export function ProjectAssistantThread({
               <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700">
                 Contexto seguro
               </span>
+              {history.length > 0 ? <button type="button" onClick={prepareProposal} disabled={isPreparingProposal} className="rounded-full border border-teal-600/30 bg-teal-50 px-2.5 py-1 font-medium text-teal-700 disabled:opacity-50">{isPreparingProposal ? "Preparando…" : "Preparar propuesta"}</button> : null}
             </div>
           </div>
         </header>

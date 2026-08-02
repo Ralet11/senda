@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function reviewProposalAction(
   proposalId: string,
-  nextStatus: "ACCEPTED" | "DISCARDED",
+  nextStatus: "ACCEPTED" | "DECLINED",
 ) {
   const user = await requireAdmin();
 

@@ -12,12 +12,12 @@ function formatDate(value: Date) {
 
 function statusLabel(status: string) {
   switch (status) {
-    case "PENDING":
-      return "Pendiente";
+    case "SUBMITTED":
+      return "Enviada";
     case "ACCEPTED":
       return "Aceptada";
-    case "DISCARDED":
-      return "Descartada";
+    case "DECLINED":
+      return "Rechazada";
     default:
       return status;
   }
@@ -62,7 +62,7 @@ export default async function AdminInboxPage() {
           <div className="grid gap-4">
             {proposals.map((proposal) => {
               const acceptAction = reviewProposalAction.bind(null, proposal.id, "ACCEPTED");
-              const discardAction = reviewProposalAction.bind(null, proposal.id, "DISCARDED");
+              const discardAction = reviewProposalAction.bind(null, proposal.id, "DECLINED");
 
               return (
                 <article
@@ -77,7 +77,7 @@ export default async function AdminInboxPage() {
                         </h2>
                         <span
                           className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                            proposal.status === "PENDING"
+                            proposal.status === "SUBMITTED"
                               ? "bg-amber-50 text-amber-700"
                               : proposal.status === "ACCEPTED"
                                 ? "bg-emerald-50 text-emerald-700"
@@ -104,7 +104,7 @@ export default async function AdminInboxPage() {
                       </p>
                     </div>
 
-                    {proposal.status === "PENDING" ? (
+                    {proposal.status === "SUBMITTED" ? (
                       <div className="flex flex-wrap gap-2">
                         <form action={acceptAction}>
                           <SubmitButton
