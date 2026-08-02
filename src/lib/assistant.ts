@@ -450,10 +450,11 @@ async function buildImageInputParts(attachments: AssistantImageAttachment[]): Pr
   );
 }
 
-async function getRecentConversation(projectId: string) {
+async function getRecentConversation(projectId: string, assistantSessionId: string) {
   const chunks = await prisma.projectContextChunk.findMany({
     where: {
       projectId,
+      assistantSessionId,
       source: {
         in: ["assistant_user", "assistant_reply"],
       },
@@ -468,10 +469,11 @@ async function getRecentConversation(projectId: string) {
   }));
 }
 
-export async function getAssistantHistory(projectId: string): Promise<AssistantHistoryItem[]> {
+export async function getAssistantHistory(projectId: string, assistantSessionId: string): Promise<AssistantHistoryItem[]> {
   const chunks = await prisma.projectContextChunk.findMany({
     where: {
       projectId,
+      assistantSessionId,
       source: {
         in: ["assistant_user", "assistant_reply"],
       },
@@ -500,6 +502,7 @@ export async function getAssistantHistory(projectId: string): Promise<AssistantH
 
 export async function createAssistantReply(
   projectId: string,
+  assistantSessionId: string,
   message: string,
   input: { uploadedById: string; attachments: AssistantImageAttachment[] },
 ) {
@@ -561,7 +564,7 @@ export async function createAssistantReply(
 
   const createdProposal = shouldCreateProposal && !existingProposal;
   const [history, semanticContext] = await Promise.all([
-    getRecentConversation(projectId),
+    getRecentConversation(projectId, assistantSessionId),
     searchProjectContext({ projectId, question: message }).catch((error) => {
       console.error("semantic context search failed", error);
       return [] as SemanticContextResult[];
@@ -598,6 +601,7 @@ export async function createAssistantReply(
     const userChunk = await tx.projectContextChunk.create({
       data: {
         projectId,
+        assistantSessionId,
         source: "assistant_user",
         content: message,
       },
@@ -606,6 +610,7 @@ export async function createAssistantReply(
     const replyChunk = await tx.projectContextChunk.create({
       data: {
         projectId,
+        assistantSessionId,
         source: "assistant_reply",
         content: reply,
       },
@@ -634,6 +639,11 @@ export async function createAssistantReply(
           },
         })
       : null;
+
+    await tx.assistantSession.update({
+      where: { id: assistantSessionId },
+      data: { title },
+    });
 
     const userAttachments = await tx.chatAttachment.findMany({
       where: { assistantContextChunkId: userChunk.id },

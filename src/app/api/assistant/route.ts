@@ -10,6 +10,7 @@ const MAX_ASSISTANT_IMAGES = 2;
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const projectId = typeof body?.projectId === "string" ? body.projectId.trim() : "";
+  const sessionId = typeof body?.sessionId === "string" ? body.sessionId.trim() : "";
   const message = typeof body?.message === "string" ? body.message.trim() : "";
   const attachmentIds: string[] = [];
   if (Array.isArray(body?.attachmentIds)) {
@@ -20,8 +21,8 @@ export async function POST(request: Request) {
     }
   }
 
-  if (!projectId || !message) {
-    return NextResponse.json({ error: "projectId y message son requeridos" }, { status: 400 });
+  if (!projectId || !sessionId || !message) {
+    return NextResponse.json({ error: "projectId, sessionId y message son requeridos" }, { status: 400 });
   }
 
   if (projectId.length > 128 || message.length > MAX_MESSAGE_LENGTH || attachmentIds.length > MAX_ASSISTANT_IMAGES) {
@@ -29,6 +30,13 @@ export async function POST(request: Request) {
   }
 
   const user = await requireProjectMember(projectId);
+  const session = await prisma.assistantSession.findFirst({
+    where: { id: sessionId, projectId, userId: user.id },
+    select: { id: true },
+  });
+  if (!session) {
+    return NextResponse.json({ error: "No tenes acceso a esta sesión." }, { status: 403 });
+  }
   const rateLimit = consumeRateLimit({
     key: `assistant:${user.id}:${projectId}`,
     limit: 12,
@@ -56,7 +64,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await createAssistantReply(projectId, message, {
+    const result = await createAssistantReply(projectId, sessionId, message, {
       uploadedById: user.id,
       attachments,
     });

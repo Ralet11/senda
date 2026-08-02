@@ -61,9 +61,9 @@ const messageInclude = {
   },
 };
 
-async function getMessages(projectId: string) {
+async function getMessages(projectId: string, conversationId?: string) {
   const messages = await prisma.message.findMany({
-    where: { projectId },
+    where: { projectId, conversationId: conversationId ?? null },
     orderBy: { createdAt: "asc" },
     include: messageInclude,
   });
@@ -71,22 +71,34 @@ async function getMessages(projectId: string) {
   return messages.map(serializeMessage);
 }
 
+async function requireConversationAccess(projectId: string, conversationId: string, userId: string) {
+  return prisma.projectConversation.findFirst({
+    where: { id: conversationId, projectId, members: { some: { userId } } },
+    select: { id: true },
+  });
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const projectId = searchParams.get("projectId")?.trim();
+  const conversationId = searchParams.get("conversationId")?.trim() || undefined;
 
   if (!projectId) {
     return NextResponse.json({ error: "projectId es requerido" }, { status: 400 });
   }
 
-  await requireProjectMember(projectId);
+  const user = await requireProjectMember(projectId);
+  if (conversationId && !(await requireConversationAccess(projectId, conversationId, user.id))) {
+    return NextResponse.json({ error: "No tenes acceso a esta conversación." }, { status: 403 });
+  }
 
-  return NextResponse.json({ messages: await getMessages(projectId) });
+  return NextResponse.json({ messages: await getMessages(projectId, conversationId) });
 }
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const projectId = typeof body?.projectId === "string" ? body.projectId.trim() : "";
+  const conversationId = typeof body?.conversationId === "string" ? body.conversationId.trim() || undefined : undefined;
   const messageBody = typeof body?.body === "string" ? body.body.trim() : "";
   const attachmentIds: string[] = [];
   if (Array.isArray(body?.attachmentIds)) {
@@ -106,6 +118,9 @@ export async function POST(request: Request) {
   }
 
   const user = await requireProjectMember(projectId);
+  if (conversationId && !(await requireConversationAccess(projectId, conversationId, user.id))) {
+    return NextResponse.json({ error: "No tenes acceso a esta conversación." }, { status: 403 });
+  }
   const rateLimit = consumeRateLimit({
     key: `chat:${user.id}:${projectId}`,
     limit: 30,
@@ -121,7 +136,7 @@ export async function POST(request: Request) {
   try {
     const message = await prisma.$transaction(async (tx) => {
       const created = await tx.message.create({
-        data: { projectId, authorId: user.id, body: messageBody },
+        data: { projectId, conversationId, authorId: user.id, body: messageBody },
       });
 
       if (attachmentIds.length > 0) {

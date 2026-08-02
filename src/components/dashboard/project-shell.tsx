@@ -1,30 +1,46 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { LogoutButton } from "@/components/ui/logout-button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 type ProjectNavItem = { href: string; label: string };
 type ProjectSummary = { id: string; name: string; phase: string; progress: number };
-type ProjectShellProps = { currentProjectId: string; currentProjectName: string; navItems: ProjectNavItem[]; projects: ProjectSummary[]; children: React.ReactNode };
+type ConversationSummary = { id: string; label: string };
+type AssistantSessionSummary = { id: string; title: string };
+type ProjectShellProps = { currentProjectId: string; currentProjectName: string; navItems: ProjectNavItem[]; projects: ProjectSummary[]; directConversations: ConversationSummary[]; assistantSessions: AssistantSessionSummary[]; availableMembers: Array<{ id: string; name: string }>; children: React.ReactNode };
 
-export function ProjectShell({ currentProjectId, currentProjectName, projects, children }: ProjectShellProps) {
+export function ProjectShell({ currentProjectId, currentProjectName, projects, directConversations, assistantSessions, availableMembers, children }: ProjectShellProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const isConversation = pathname.endsWith("/chat") || pathname.endsWith("/assistant");
   const teamHref = `/projects/${currentProjectId}/chat`;
   const assistantHref = `/projects/${currentProjectId}/assistant`;
   const summaryHref = `/projects/${currentProjectId}`;
+  const [showDirectPicker, setShowDirectPicker] = useState(false);
+  const [selectedMember, setSelectedMember] = useState(availableMembers[0]?.id ?? "");
+  const [isCreatingDirect, setIsCreatingDirect] = useState(false);
+
+  async function createDirectConversation() {
+    if (!selectedMember) return;
+    setIsCreatingDirect(true);
+    const response = await fetch("/api/chat/conversations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId: currentProjectId, memberId: selectedMember }) });
+    const data = await response.json().catch(() => null) as { conversation?: { id: string } } | null;
+    if (response.ok && data?.conversation) window.location.assign(`${teamHref}?conversation=${data.conversation.id}`);
+    setIsCreatingDirect(false);
+  }
 
   return <div className="h-screen overflow-hidden bg-[var(--background)] text-[var(--foreground)]"><div className="grid h-screen grid-cols-[220px_minmax(0,1fr)]">
     <aside className="senda-project-sidebar flex h-screen flex-col overflow-hidden border-r border-[var(--border-soft)] bg-[var(--surface-muted)] px-3 py-4">
       <Link href={summaryHref} className="flex items-center gap-2 px-2"><span className="senda-brand-mark flex h-8 w-8 items-center justify-center rounded-xl text-base font-bold text-white">S</span><strong className="text-[15px] tracking-tight">senda</strong></Link>
       <div className="mt-7 px-2"><p className="truncate text-sm font-semibold">{currentProjectName}</p><p className="mt-0.5 text-[11px] text-zinc-500">Proyecto activo</p></div>
       <nav className="mt-5 space-y-1">
-        <Link href={summaryHref} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${!isConversation ? "bg-white font-medium shadow-sm" : "text-zinc-600 hover:bg-white"}`}><span className="text-zinc-400">◦</span>Resumen</Link>
-        <Link href={teamHref} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${isConversation ? "bg-white font-medium shadow-sm" : "text-zinc-600 hover:bg-white"}`}><span className="text-zinc-400">◦</span>Conversaciones</Link>
+        <Link href={summaryHref} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${!isConversation ? "bg-[var(--surface)] font-medium shadow-sm" : "text-zinc-600 hover:bg-[var(--surface-strong)]"}`}><span className="text-zinc-400">◦</span>Resumen</Link>
+        <Link href={teamHref} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${isConversation ? "bg-[var(--surface)] font-medium shadow-sm" : "text-zinc-600 hover:bg-[var(--surface-strong)]"}`}><span className="text-zinc-400">◦</span>Conversaciones</Link>
       </nav>
-      {isConversation ? <div className="mt-7 border-t border-[var(--border-soft)] pt-5"><p className="px-2 text-[10px] font-bold uppercase tracking-[.14em] text-zinc-400">Canales</p><div className="mt-2 space-y-1"><Link href={teamHref} className={`block rounded-lg px-3 py-2 text-sm ${pathname.endsWith("/chat") ? "bg-[#173247] text-white" : "text-zinc-600 hover:bg-white"}`}>Equipo Senda<span className={`mt-0.5 block text-[11px] ${pathname.endsWith("/chat") ? "text-slate-300" : "text-zinc-400"}`}>Canal compartido</span></Link><Link href={assistantHref} className={`block rounded-lg px-3 py-2 text-sm ${pathname.endsWith("/assistant") ? "bg-[#173247] text-white" : "text-zinc-600 hover:bg-white"}`}>Senda AI<span className={`mt-0.5 block text-[11px] ${pathname.endsWith("/assistant") ? "text-slate-300" : "text-zinc-400"}`}>Tus consultas</span></Link></div></div> : null}
+      {isConversation ? <div className="mt-7 border-t border-[var(--border-soft)] pt-5"><p className="px-2 text-[10px] font-bold uppercase tracking-[.14em] text-zinc-400">Canales</p><div className="mt-2 space-y-1"><Link href={teamHref} className={`block rounded-lg px-3 py-2 text-sm ${pathname.endsWith("/chat") && !searchParams.get("conversation") ? "bg-[#173247] text-white" : "text-zinc-600 hover:bg-[var(--surface-strong)]"}`}>Equipo Senda<span className="mt-0.5 block text-[11px] text-zinc-400">Canal compartido</span></Link>{directConversations.map((conversation) => <Link key={conversation.id} href={`${teamHref}?conversation=${conversation.id}`} className={`block truncate rounded-lg px-3 py-2 text-sm ${searchParams.get("conversation") === conversation.id ? "bg-[#173247] text-white" : "text-zinc-600 hover:bg-[var(--surface-strong)]"}`}>{conversation.label}<span className="mt-0.5 block text-[11px] text-zinc-400">Conversación privada</span></Link>)}{availableMembers.length > 0 ? <><button type="button" onClick={() => setShowDirectPicker((visible) => !visible)} className="w-full px-3 py-1 text-left text-xs font-medium text-teal-600 hover:text-teal-500">+ Nuevo directo</button>{showDirectPicker ? <div className="rounded-lg border border-[var(--border-soft)] p-2"><select value={selectedMember} onChange={(event) => setSelectedMember(event.target.value)} className="w-full bg-transparent text-xs outline-none"><option value="">Elegí una persona</option>{availableMembers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select><button type="button" disabled={!selectedMember || isCreatingDirect} onClick={createDirectConversation} className="mt-2 w-full rounded-md bg-[#173247] px-2 py-1.5 text-xs font-medium text-white disabled:opacity-50">{isCreatingDirect ? "Abriendo…" : "Abrir chat"}</button></div> : null}</> : null}<Link href={assistantHref} className={`mt-3 block rounded-lg px-3 py-2 text-sm ${pathname.endsWith("/assistant") ? "bg-[#173247] text-white" : "text-zinc-600 hover:bg-[var(--surface-strong)]"}`}>Senda AI<span className="mt-0.5 block text-[11px] text-zinc-400">Tus consultas</span></Link>{pathname.endsWith("/assistant") ? <div className="mt-1 space-y-1 border-l border-[var(--border-soft)] pl-2"><Link prefetch={false} href={`${assistantHref}?new=1`} className="block px-2 py-1 text-xs font-medium text-teal-600 hover:text-teal-500">+ Nueva conversación</Link>{assistantSessions.map((session) => <Link key={session.id} href={`${assistantHref}?session=${session.id}`} className={`block truncate rounded-md px-2 py-1.5 text-xs ${searchParams.get("session") === session.id ? "bg-[var(--surface-strong)] font-medium" : "text-zinc-500 hover:bg-[var(--surface-strong)]"}`}>{session.title}</Link>)}</div> : null}</div></div> : null}
       {projects.length > 1 ? <div className="mt-7 border-t border-[var(--border-soft)] pt-5"><p className="px-2 text-[10px] font-bold uppercase tracking-[.14em] text-zinc-400">Proyectos</p><div className="mt-2 space-y-1">{projects.filter((project) => project.id !== currentProjectId).map((project) => <Link key={project.id} href={`/projects/${project.id}`} className="block truncate rounded-lg px-3 py-2 text-xs text-zinc-600 hover:bg-white">{project.name}</Link>)}</div></div> : null}
       <div className="mt-auto space-y-2 px-2"><ThemeToggle embedded /><LogoutButton /></div>
     </aside>

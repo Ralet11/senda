@@ -40,6 +40,7 @@ type CurrentUser = {
 
 type ProjectChatThreadProps = {
   projectId: string;
+  conversationId?: string;
   initialMessages: ChatMessage[];
   currentUser: CurrentUser;
 };
@@ -80,6 +81,7 @@ function isOwnMessage(message: ChatMessage, currentUserId: string) {
 
 export function ProjectChatThread({
   projectId,
+  conversationId,
   initialMessages,
   currentUser,
 }: ProjectChatThreadProps) {
@@ -117,7 +119,9 @@ export function ProjectChatThread({
 
     const poll = async () => {
       try {
-        const res = await fetch(`/api/chat?projectId=${encodeURIComponent(projectId)}`, {
+        const query = new URLSearchParams({ projectId });
+        if (conversationId) query.set("conversationId", conversationId);
+        const res = await fetch(`/api/chat?${query.toString()}`, {
           cache: "no-store",
         });
 
@@ -135,7 +139,7 @@ export function ProjectChatThread({
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [projectId]);
+  }, [projectId, conversationId]);
 
   const orderedMessages = useMemo(() => messages, [messages]);
 
@@ -204,7 +208,7 @@ export function ProjectChatThread({
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectId, body: trimmedBody, attachmentIds }),
+      body: JSON.stringify({ projectId, conversationId, body: trimmedBody, attachmentIds }),
     });
 
     const data = (await res.json().catch(() => null)) as
@@ -226,7 +230,7 @@ export function ProjectChatThread({
   return (
     <main className="flex h-full min-h-0 flex-col">
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
-        <header className="border-b border-zinc-100 bg-white px-8 py-4">
+        <header className="border-b border-zinc-100 bg-white px-6 py-3">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
@@ -249,7 +253,7 @@ export function ProjectChatThread({
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col bg-white">
-          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
             {orderedMessages.length === 0 ? (
               <div className="flex h-full min-h-[260px] flex-col items-center justify-center px-6 text-center">
                 <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--brand-soft)] text-sm font-bold text-[var(--brand-strong)]">E</span>
@@ -257,7 +261,7 @@ export function ProjectChatThread({
                 <p className="mt-2 max-w-sm text-sm leading-6 text-zinc-500">Compartí una consulta, una decisión o una actualización. El equipo Senda y los miembros del proyecto la verán acá.</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {orderedMessages.map((message) => {
                   const own = isOwnMessage(message, currentUser.id);
                   const authorName = getAuthorName(message);
@@ -284,7 +288,7 @@ export function ProjectChatThread({
                       ) : null}
 
                       <article
-                        className={`max-w-[92%] lg:max-w-[88%] rounded-2xl border px-4 py-3 shadow-sm ${
+                        className={`max-w-[92%] lg:max-w-[88%] rounded-2xl border px-3 py-2.5 shadow-sm ${
                           own
                             ? "border-zinc-950 bg-zinc-950 text-white"
                             : message.isFromAssistant
@@ -309,7 +313,7 @@ export function ProjectChatThread({
                             {formatTimestamp(message.createdAt)}
                           </span>
                         </div>
-                        {message.body ? <p className="mt-1.5 whitespace-pre-wrap text-sm leading-6">{message.body}</p> : null}
+                        {message.body ? <p className="mt-1 whitespace-pre-wrap text-[13px] leading-5">{message.body}</p> : null}
                         {message.attachments.length > 0 ? (
                           <div className="mt-3 flex flex-wrap gap-2">
                             {message.attachments.map((attachment) => (
@@ -335,7 +339,7 @@ export function ProjectChatThread({
             )}
           </div>
 
-          <div className="border-t border-zinc-100 bg-white px-8 py-4">
+          <div className="border-t border-zinc-100 bg-white px-5 py-3">
             <form onSubmit={handleSubmit} onDragOver={(event) => { event.preventDefault(); setIsDraggingImage(true); }} onDragLeave={() => setIsDraggingImage(false)} onDrop={handleImageDrop} className={`space-y-2 ${isDraggingImage ? "rounded-xl bg-[var(--brand-soft)] p-2" : ""}`}>
               {selectedImages.length > 0 ? (
                 <div className="flex flex-wrap gap-2 rounded-t-xl border border-b-0 border-zinc-300 bg-[var(--surface)] px-3 pt-3">

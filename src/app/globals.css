@@ -75,6 +75,7 @@ input, textarea, select { background: var(--surface); color: var(--foreground); 
 .senda-project-hero .bg-sky-50 { background-color: rgba(89,220,204,.18) !important; }
 .senda-project-hero-panel { background: rgba(248, 250, 252, .95) !important; color: #132332; }
 html[data-theme="dark"] .senda-project-sidebar { background: var(--surface-muted); }
+html[data-theme="dark"] .senda-theme-toggle { background-color: var(--surface-strong) !important; border-color: var(--border-soft) !important; }
 html[data-theme="dark"] .senda-project-hero-panel { background: #19313e !important; border-color: #3d5965 !important; color: #edf7f8; }
 html[data-theme="dark"] .senda-project-hero-panel .bg-slate-100,
 html[data-theme="dark"] .senda-project-hero-panel .bg-slate-50 { background-color: #223d4a !important; }

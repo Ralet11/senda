@@ -44,11 +44,22 @@ function serializeMessage(message: {
 
 export default async function ProjectChatPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ projectId: string }>;
+  searchParams: Promise<{ conversation?: string }>;
 }) {
   const { projectId } = await params;
+  const { conversation: requestedConversation } = await searchParams;
   const user = await requireProjectMember(projectId);
+
+  const conversationId = requestedConversation
+    ? (await prisma.projectConversation.findFirst({
+        where: { id: requestedConversation, projectId, members: { some: { userId: user.id } } },
+        select: { id: true },
+      }))?.id
+    : undefined;
+  if (requestedConversation && !conversationId) notFound();
 
   const [project, messages] = await Promise.all([
     prisma.project.findUnique({
@@ -56,7 +67,7 @@ export default async function ProjectChatPage({
       select: { id: true },
     }),
     prisma.message.findMany({
-      where: { projectId },
+      where: { projectId, conversationId: conversationId ?? null },
       orderBy: { createdAt: "asc" },
       include: {
         author: {
@@ -82,6 +93,7 @@ export default async function ProjectChatPage({
   return (
     <ConversationFrame><ProjectChatThread
       projectId={projectId}
+      conversationId={conversationId}
       currentUser={{
         id: user.id,
         name: user.name,

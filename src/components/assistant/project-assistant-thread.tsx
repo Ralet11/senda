@@ -29,6 +29,7 @@ type ProposalInfo = {
 
 type ProjectAssistantThreadProps = {
   projectId: string;
+  sessionId: string;
   initialHistory: AssistantItem[];
 };
 
@@ -43,6 +44,7 @@ function formatTimestamp(value: string) {
 
 export function ProjectAssistantThread({
   projectId,
+  sessionId,
   initialHistory,
 }: ProjectAssistantThreadProps) {
   const [history, setHistory] = useState(initialHistory);
@@ -159,7 +161,7 @@ export function ProjectAssistantThread({
     const res = await fetch("/api/assistant", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectId, message: trimmed, attachmentIds }),
+      body: JSON.stringify({ projectId, sessionId, message: trimmed, attachmentIds }),
     });
 
     const data = (await res.json().catch(() => null)) as
@@ -201,7 +203,7 @@ export function ProjectAssistantThread({
   return (
     <main className="flex h-full min-h-0 flex-col">
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
-        <header className="border-b border-zinc-100 bg-white px-8 py-4">
+        <header className="border-b border-zinc-100 bg-white px-6 py-3">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
@@ -223,13 +225,13 @@ export function ProjectAssistantThread({
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col bg-white">
-          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
             {history.length === 0 ? (
               <div className="flex h-full min-h-[260px] items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-white/70 px-6 text-sm text-zinc-500">
                 Todavia no hay conversacion con el assistant.
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {history.map((item) => {
                   const own = item.role === "user";
 
@@ -239,7 +241,7 @@ export function ProjectAssistantThread({
                       className={`flex ${own ? "justify-end" : "justify-start"}`}
                     >
                       <article
-                        className={`max-w-[92%] lg:max-w-[88%] rounded-2xl border px-4 py-3 shadow-sm ${
+                        className={`max-w-[92%] lg:max-w-[88%] rounded-2xl border px-3 py-2.5 shadow-sm ${
                           own
                             ? "border-zinc-950 bg-zinc-950 text-white"
                             : "border-sky-200 bg-sky-50 text-zinc-900"
@@ -259,7 +261,7 @@ export function ProjectAssistantThread({
                             {formatTimestamp(item.createdAt)}
                           </span>
                         </div>
-                        <p className="mt-1.5 whitespace-pre-wrap text-sm leading-6">
+                        <p className="mt-1 whitespace-pre-wrap text-[13px] leading-5">
                           {item.content}
                         </p>
                         {item.attachments?.length ? (
@@ -294,7 +296,7 @@ export function ProjectAssistantThread({
             )}
           </div>
 
-          <div className="border-t border-zinc-100 bg-white px-8 py-4">
+          <div className="border-t border-zinc-100 bg-white px-5 py-3">
             <form onSubmit={handleSubmit} onDragOver={(event) => { event.preventDefault(); setIsDraggingImage(true); }} onDragLeave={() => setIsDraggingImage(false)} onDrop={handleImageDrop} className={`space-y-2 ${isDraggingImage ? "rounded-xl bg-[var(--brand-soft)] p-2" : ""}`}>
               {selectedImages.length > 0 ? (
                 <div className="flex flex-wrap gap-2 rounded-t-xl border border-b-0 border-zinc-300 bg-[var(--surface)] px-3 pt-3">
