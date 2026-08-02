@@ -15,6 +15,12 @@ function serializeMessage(message: {
     email: string;
     globalRole: string;
   } | null;
+  attachments: {
+    id: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+  }[];
 }) {
   return {
     id: message.id,
@@ -29,6 +35,10 @@ function serializeMessage(message: {
           globalRole: message.author.globalRole,
         }
       : null,
+    attachments: message.attachments.map((attachment) => ({
+      ...attachment,
+      url: `/api/chat/attachments/${attachment.id}`,
+    })),
   };
 }
 
@@ -56,6 +66,10 @@ export default async function ProjectChatPage({
             email: true,
             globalRole: true,
           },
+        },
+        attachments: {
+          orderBy: { createdAt: "asc" },
+          select: { id: true, fileName: true, mimeType: true, sizeBytes: true },
         },
       },
     }),

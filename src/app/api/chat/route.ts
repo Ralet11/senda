@@ -4,8 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { consumeRateLimit } from "@/lib/rate-limit";
 
 const MAX_MESSAGE_LENGTH = 4_000;
+const MAX_ATTACHMENTS_PER_MESSAGE = 4;
 
-function serializeMessage(message: {
+type MessageWithRelations = {
   id: string;
   body: string;
   createdAt: Date;
@@ -16,7 +17,15 @@ function serializeMessage(message: {
     email: string;
     globalRole: string;
   } | null;
-}) {
+  attachments: {
+    id: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+  }[];
+};
+
+function serializeMessage(message: MessageWithRelations) {
   return {
     id: message.id,
     body: message.body,
@@ -30,23 +39,33 @@ function serializeMessage(message: {
           globalRole: message.author.globalRole,
         }
       : null,
+    attachments: message.attachments.map((attachment) => ({
+      ...attachment,
+      url: `/api/chat/attachments/${attachment.id}`,
+    })),
   };
 }
+
+const messageInclude = {
+  author: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      globalRole: true,
+    },
+  },
+  attachments: {
+    orderBy: { createdAt: "asc" as const },
+    select: { id: true, fileName: true, mimeType: true, sizeBytes: true },
+  },
+};
 
 async function getMessages(projectId: string) {
   const messages = await prisma.message.findMany({
     where: { projectId },
     orderBy: { createdAt: "asc" },
-    include: {
-      author: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          globalRole: true,
-        },
-      },
-    },
+    include: messageInclude,
   });
 
   return messages.map(serializeMessage);
@@ -62,29 +81,28 @@ export async function GET(request: Request) {
 
   await requireProjectMember(projectId);
 
-  return NextResponse.json({
-    messages: await getMessages(projectId),
-  });
+  return NextResponse.json({ messages: await getMessages(projectId) });
 }
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
-  const projectId =
-    typeof body?.projectId === "string" ? body.projectId.trim() : "";
+  const projectId = typeof body?.projectId === "string" ? body.projectId.trim() : "";
   const messageBody = typeof body?.body === "string" ? body.body.trim() : "";
-
-  if (!projectId || !messageBody) {
-    return NextResponse.json(
-      { error: "projectId y body son requeridos" },
-      { status: 400 },
-    );
+  const attachmentIds: string[] = [];
+  if (Array.isArray(body?.attachmentIds)) {
+    for (const candidate of body.attachmentIds) {
+      if (typeof candidate === "string" && candidate.length > 0 && !attachmentIds.includes(candidate)) {
+        attachmentIds.push(candidate);
+      }
+    }
   }
 
-  if (projectId.length > 128 || messageBody.length > MAX_MESSAGE_LENGTH) {
-    return NextResponse.json(
-      { error: "El mensaje supera el máximo de 4000 caracteres." },
-      { status: 400 },
-    );
+  if (!projectId || (!messageBody && attachmentIds.length === 0)) {
+    return NextResponse.json({ error: "Escribi un mensaje o adjunta una imagen." }, { status: 400 });
+  }
+
+  if (projectId.length > 128 || messageBody.length > MAX_MESSAGE_LENGTH || attachmentIds.length > MAX_ATTACHMENTS_PER_MESSAGE) {
+    return NextResponse.json({ error: "El mensaje supera el maximo de 4000 caracteres o 4 imagenes." }, { status: 400 });
   }
 
   const user = await requireProjectMember(projectId);
@@ -95,30 +113,33 @@ export async function POST(request: Request) {
   });
   if (!rateLimit.allowed) {
     return NextResponse.json(
-      { error: "Demasiados mensajes. Esperá un momento antes de continuar." },
+      { error: "Demasiados mensajes. Espera un momento antes de continuar." },
       { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
     );
   }
 
-  const message = await prisma.message.create({
-    data: {
-      projectId,
-      authorId: user.id,
-      body: messageBody,
-    },
-    include: {
-      author: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          globalRole: true,
-        },
-      },
-    },
-  });
+  try {
+    const message = await prisma.$transaction(async (tx) => {
+      const created = await tx.message.create({
+        data: { projectId, authorId: user.id, body: messageBody },
+      });
 
-  return NextResponse.json({
-    message: serializeMessage(message),
-  });
+      if (attachmentIds.length > 0) {
+        const attached = await tx.chatAttachment.updateMany({
+          where: { id: { in: attachmentIds }, projectId, uploadedById: user.id, messageId: null },
+          data: { messageId: created.id },
+        });
+        if (attached.count !== attachmentIds.length) throw new Error("INVALID_ATTACHMENTS");
+      }
+
+      return tx.message.findUniqueOrThrow({ where: { id: created.id }, include: messageInclude });
+    });
+
+    return NextResponse.json({ message: serializeMessage(message) });
+  } catch (error) {
+    if (error instanceof Error && error.message === "INVALID_ATTACHMENTS") {
+      return NextResponse.json({ error: "Una de las imagenes ya no esta disponible. Intenta subirla otra vez." }, { status: 400 });
+    }
+    throw error;
+  }
 }

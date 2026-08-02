@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { readChatImage } from "@/lib/chat-attachments";
 import { researchProjectRepo, type RepoResearchResult } from "@/lib/project-repo";
 import {
   embedProjectContextChunks,
@@ -13,12 +14,28 @@ type AssistantHistoryItem = {
   content: string;
   createdAt: string;
   research?: { used: boolean; evidenceCount: number };
+  attachments?: Array<{ id: string; fileName: string; mimeType: string; sizeBytes: number; url: string }>;
 };
 
 type OpenAIMessage = {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: string | OpenAIInputPart[];
 };
+
+type OpenAIInputPart =
+  | { type: "input_text"; text: string }
+  | { type: "input_image"; image_url: string; detail: "low" };
+
+type AssistantImageAttachment = {
+  id: string;
+  storageKey: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+};
+
+const MAX_ASSISTANT_IMAGES = 2;
+const MAX_ASSISTANT_IMAGE_BYTES = 4 * 1024 * 1024;
 
 function formatDate(value: Date | null) {
   if (!value) return "sin fecha";
@@ -343,6 +360,7 @@ function buildSystemPrompt(input: {
     "Si te preguntan por estado, hitos, equipo, riesgos o proximos pasos, usa el contexto del proyecto.",
     "Para una pregunta sobre funcionamiento o implementacion, usa solamente la investigacion tecnica provista abajo. No prometas que vas a verificar algo en backend, codigo o configuracion: si no fue confirmado, explica ese limite o pedi una aclaracion.",
     "Nunca reveles ni describas codigo, archivos, rutas internas, variables de entorno, secretos, credenciales, URLs privadas, comandos ni detalles de infraestructura.",
+    "Si la consulta incluye imagenes, analiza solo lo que se ve y explica el comportamiento o la interfaz en lenguaje funcional. Si aparece codigo, datos sensibles o credenciales, no los transcribas ni los reveles.",
     "No inventes datos. Si algo no esta en el contexto, decilo con claridad.",
     "Por defecto responde corto, salvo que el usuario pida detalle.",
     createdProposal
@@ -415,6 +433,23 @@ async function callOpenAIResponse(messages: OpenAIMessage[]) {
   return text;
 }
 
+async function buildImageInputParts(attachments: AssistantImageAttachment[]): Promise<OpenAIInputPart[]> {
+  if (attachments.length > MAX_ASSISTANT_IMAGES) throw new Error("TOO_MANY_ASSISTANT_IMAGES");
+
+  return Promise.all(
+    attachments.map(async (attachment) => {
+      if (attachment.sizeBytes > MAX_ASSISTANT_IMAGE_BYTES) throw new Error("ASSISTANT_IMAGE_TOO_LARGE");
+      const content = await readChatImage(attachment.storageKey);
+      if (!content) throw new Error("ASSISTANT_IMAGE_MISSING");
+      return {
+        type: "input_image" as const,
+        image_url: `data:${attachment.mimeType};base64,${content.toString("base64")}`,
+        detail: "low" as const,
+      };
+    }),
+  );
+}
+
 async function getRecentConversation(projectId: string) {
   const chunks = await prisma.projectContextChunk.findMany({
     where: {
@@ -442,6 +477,12 @@ export async function getAssistantHistory(projectId: string): Promise<AssistantH
       },
     },
     orderBy: { createdAt: "asc" },
+    include: {
+      attachments: {
+        orderBy: { createdAt: "asc" },
+        select: { id: true, fileName: true, mimeType: true, sizeBytes: true },
+      },
+    },
   });
 
   return chunks.map((chunk) => ({
@@ -450,10 +491,18 @@ export async function getAssistantHistory(projectId: string): Promise<AssistantH
     content: chunk.content,
     createdAt: chunk.createdAt.toISOString(),
     research: { used: false, evidenceCount: 0 },
+    attachments: chunk.attachments.map((attachment) => ({
+      ...attachment,
+      url: `/api/chat/attachments/${attachment.id}`,
+    })),
   }));
 }
 
-export async function createAssistantReply(projectId: string, message: string) {
+export async function createAssistantReply(
+  projectId: string,
+  message: string,
+  input: { uploadedById: string; attachments: AssistantImageAttachment[] },
+) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
@@ -480,6 +529,8 @@ export async function createAssistantReply(projectId: string, message: string) {
   if (!project) {
     throw new Error("Project not found");
   }
+
+  const imageInputParts = await buildImageInputParts(input.attachments);
 
   const title = buildProposalTitle(message);
   const shouldCreateProposal = detectActionableRequest(message);
@@ -534,7 +585,10 @@ export async function createAssistantReply(projectId: string, message: string) {
     })),
     {
       role: "user",
-      content: message,
+      content: [
+        { type: "input_text", text: message },
+        ...imageInputParts,
+      ],
     },
   ];
 
@@ -557,6 +611,20 @@ export async function createAssistantReply(projectId: string, message: string) {
       },
     });
 
+    if (input.attachments.length > 0) {
+      const attached = await tx.chatAttachment.updateMany({
+        where: {
+          id: { in: input.attachments.map((attachment) => attachment.id) },
+          projectId,
+          uploadedById: input.uploadedById,
+          messageId: null,
+          assistantContextChunkId: null,
+        },
+        data: { assistantContextChunkId: userChunk.id },
+      });
+      if (attached.count !== input.attachments.length) throw new Error("INVALID_ASSISTANT_ATTACHMENTS");
+    }
+
     const proposal = createdProposal
       ? await tx.proposal.create({
           data: {
@@ -567,7 +635,13 @@ export async function createAssistantReply(projectId: string, message: string) {
         })
       : null;
 
-    return { userChunk, replyChunk, proposal };
+    const userAttachments = await tx.chatAttachment.findMany({
+      where: { assistantContextChunkId: userChunk.id },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, fileName: true, mimeType: true, sizeBytes: true },
+    });
+
+    return { userChunk, replyChunk, proposal, userAttachments };
   });
 
   try {
@@ -605,6 +679,10 @@ export async function createAssistantReply(projectId: string, message: string) {
       content: result.userChunk.content,
       createdAt: result.userChunk.createdAt.toISOString(),
       research: { used: false, evidenceCount: 0 },
+      attachments: result.userAttachments.map((attachment) => ({
+        ...attachment,
+        url: `/api/chat/attachments/${attachment.id}`,
+      })),
     },
     proposal: result.proposal
       ? {

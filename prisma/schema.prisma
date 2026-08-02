@@ -62,6 +62,7 @@ model User {
 
   memberships     ProjectMember[]
   messages        Message[]
+  uploadedAttachments ChatAttachment[]
   reviewedProposals Proposal[] @relation("ProposalReviewer")
   sessions        Session[]
   projectUpdates  ProjectUpdate[]
@@ -93,6 +94,7 @@ model Project {
   milestones    Milestone[]
   activityLogs  ActivityLog[]
   messages      Message[]
+  attachments   ChatAttachment[]
   proposals     Proposal[]
   contextChunks ProjectContextChunk[]
   updates       ProjectUpdate[]
@@ -137,6 +139,28 @@ model Message {
   isFromAssistant Boolean @default(false)
   body      String
   createdAt DateTime @default(now())
+  attachments ChatAttachment[]
+}
+
+model ChatAttachment {
+  id          String   @id @default(cuid())
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String
+  message     Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId   String?
+  assistantContextChunk ProjectContextChunk? @relation(fields: [assistantContextChunkId], references: [id], onDelete: Cascade)
+  assistantContextChunkId String?
+  uploadedBy  User     @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  uploadedById String
+  storageKey  String   @unique
+  fileName    String
+  mimeType    String
+  sizeBytes   Int
+  createdAt   DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([messageId])
+  @@index([assistantContextChunkId])
 }
 
 // Idea/pedido que el AI assistant detecta como accionable en una conversación
@@ -166,6 +190,7 @@ model ProjectContextChunk {
   embeddingModel String?
   embeddedAt     DateTime?
   createdAt      DateTime @default(now())
+  attachments    ChatAttachment[]
 
   @@index([projectId])
 }
