@@ -21,7 +21,7 @@ export default async function ProjectLayout({
       orderBy: { updatedAt: "desc" },
     }),
     prisma.assistantSession.findMany({
-      where: { projectId, userId: user.id },
+      where: { projectId, userId: user.id, contextChunks: { some: {} } },
       select: { id: true, title: true },
       orderBy: { updatedAt: "desc" },
       take: 12,

@@ -10,6 +10,7 @@ import {
   type DragEvent,
   type FormEvent,
 } from "react";
+import { useRouter } from "next/navigation";
 
 type AssistantItem = {
   id: string;
@@ -47,6 +48,7 @@ export function ProjectAssistantThread({
   sessionId,
   initialHistory,
 }: ProjectAssistantThreadProps) {
+  const router = useRouter();
   const [history, setHistory] = useState(initialHistory);
   const [message, setMessage] = useState("");
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
@@ -198,6 +200,7 @@ export function ProjectAssistantThread({
     );
     setProposal(data.proposal ?? null);
     setSelectedImages([]);
+    router.refresh();
   }
 
   return (

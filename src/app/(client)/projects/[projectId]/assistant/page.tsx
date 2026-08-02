@@ -40,5 +40,5 @@ export default async function ProjectAssistantPage({
     notFound();
   }
 
-  return <ConversationFrame><ProjectAssistantThread projectId={projectId} sessionId={session.id} initialHistory={history} /></ConversationFrame>;
+  return <ConversationFrame><ProjectAssistantThread key={session.id} projectId={projectId} sessionId={session.id} initialHistory={history} /></ConversationFrame>;
 }
