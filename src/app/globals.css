@@ -17,19 +17,19 @@
 }
 
 :root[data-theme="dark"] {
-  --background: #101a22;
-  --foreground: #e9f1f3;
-  --surface: #17242e;
-  --surface-muted: #20323d;
-  --surface-strong: #2b414c;
-  --border-soft: #304650;
-  --text-strong: #f4f8f8;
-  --text-default: #c5d2d6;
-  --text-muted: #91a4ac;
-  --brand: #49c9b9;
-  --brand-strong: #82e5d7;
-  --brand-soft: #173e40;
-  --navy: #0b141c;
+  --background: #081820;
+  --foreground: #eaf6f5;
+  --surface: #0f2631;
+  --surface-muted: #123340;
+  --surface-strong: #184554;
+  --border-soft: #285766;
+  --text-strong: #f2fbfa;
+  --text-default: #c9dfdf;
+  --text-muted: #91b5ba;
+  --brand: #42cdbd;
+  --brand-strong: #7be6d8;
+  --brand-soft: #123f43;
+  --navy: #091720;
 }
 
 @theme inline {
@@ -50,6 +50,7 @@ input, textarea, select { background: var(--surface); color: var(--foreground); 
   .bg-white { background-color: var(--surface) !important; }
   .bg-zinc-50 { background-color: var(--background) !important; }
   .bg-zinc-100 { background-color: var(--surface-muted) !important; }
+  .bg-zinc-100\/45 { background-color: color-mix(in srgb, var(--surface-muted) 78%, transparent) !important; }
   .bg-sky-50 { background-color: color-mix(in srgb, var(--brand-soft) 64%, var(--surface) 36%) !important; }
   .bg-emerald-50 { background-color: color-mix(in srgb, var(--brand-soft) 60%, var(--surface) 40%) !important; }
   .bg-amber-50 { background-color: #fff4db !important; }
@@ -64,8 +65,8 @@ input, textarea, select { background: var(--surface); color: var(--foreground); 
 .senda-shell { background: radial-gradient(circle at 85% -15%, #d9f4ef 0, transparent 29rem), var(--background); }
 .senda-sidebar { background: color-mix(in srgb, var(--surface) 90%, transparent); backdrop-filter: blur(18px); }
 .senda-brand-mark { background: linear-gradient(135deg, #0f766e, #38bdae); box-shadow: 0 10px 24px rgba(15,118,110,.24); }
-.senda-project-hero { background: linear-gradient(120deg, var(--navy), #24475a); box-shadow: 0 18px 45px rgba(21,42,59,.16); }
-.senda-project-hero::after { content: ""; position: absolute; width: 17rem; height: 17rem; border-radius: 999px; right: -5rem; top: -10rem; background: rgba(92,220,203,.18); filter: blur(2px); }
+.senda-project-hero { background: linear-gradient(120deg, var(--navy), #174355); box-shadow: 0 18px 45px rgba(21,42,59,.16); }
+.senda-project-hero::after { content: ""; position: absolute; right: -1.5rem; bottom: -1.25rem; width: 28rem; height: 14rem; opacity: .46; background: url("data:image/svg+xml,%3Csvg viewBox='0 0 460 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M-10 184C65 172 56 81 132 91c57 8 52 82 117 72 73-11 64-100 142-91 35 4 54 31 82 4' fill='none' stroke='%235ad6c8' stroke-width='2' stroke-linecap='round' stroke-dasharray='4 9'/%3E%3Cg fill='%23b5fff5'%3E%3Ccircle cx='64' cy='142' r='5'/%3E%3Ccircle cx='132' cy='91' r='5'/%3E%3Ccircle cx='249' cy='163' r='5'/%3E%3Ccircle cx='391' cy='72' r='5'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat; }
 .senda-project-hero .text-zinc-950, .senda-project-hero .text-zinc-900, .senda-project-hero .text-zinc-800 { color: #fff !important; }
 .senda-project-hero .text-zinc-700, .senda-project-hero .text-zinc-600, .senda-project-hero .text-zinc-500 { color: #d1e0e3 !important; }
 .senda-project-hero .bg-zinc-100 { background-color: rgba(255,255,255,.1) !important; }
