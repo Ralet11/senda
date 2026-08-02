@@ -179,8 +179,10 @@ export function ProjectChatThread({
         <div className="flex min-h-0 flex-1 flex-col bg-zinc-100/40">
           <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
             {orderedMessages.length === 0 ? (
-              <div className="flex h-full min-h-[260px] items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-white/70 px-6 text-sm text-zinc-500">
-                Todavia no hay mensajes en este proyecto.
+              <div className="flex h-full min-h-[260px] flex-col items-center justify-center px-6 text-center">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--brand-soft)] text-sm font-bold text-[var(--brand-strong)]">E</span>
+                <h2 className="mt-4 text-xl font-semibold text-zinc-950">Empeza la conversacion</h2>
+                <p className="mt-2 max-w-sm text-sm leading-6 text-zinc-500">Compartí una consulta, una decisión o una actualización. El equipo Senda y los miembros del proyecto la verán acá.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -254,7 +256,7 @@ export function ProjectChatThread({
 
           <div className="border-t border-zinc-200 bg-white/96 px-3 py-2">
             <form onSubmit={handleSubmit} className="space-y-2">
-              <div className="rounded-xl border border-zinc-300 bg-[var(--surface)] px-3 py-2 shadow-sm focus-within:border-zinc-400">
+              <div className="flex items-end gap-2 rounded-xl border border-zinc-300 bg-[var(--surface)] px-3 py-1.5 shadow-sm focus-within:border-zinc-400">
                 <div className="hidden items-center justify-between gap-3 text-[11px]">
                   <p className="min-w-0 truncate font-medium text-zinc-800">{currentUser.name}</p>
                   <div className="shrink-0 rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700">
@@ -269,10 +271,10 @@ export function ProjectChatThread({
                   rows={1}
                   required
                   placeholder="Escribi una consulta o actualizacion para el equipo..."
-                  className="min-h-[34px] max-h-28 w-full resize-none bg-transparent py-1 text-sm leading-5 text-zinc-900 outline-none placeholder:text-zinc-500"
+                  className="min-h-[34px] max-h-28 flex-1 resize-none bg-transparent py-1.5 text-sm leading-5 text-zinc-900 outline-none placeholder:text-zinc-500"
                 />
 
-                <div className="mt-1 flex items-center justify-end gap-3 border-t border-zinc-200 pt-1">
+                <div className="hidden mt-1 flex items-center justify-end gap-3 border-t border-zinc-200 pt-1">
                   <p className="hidden text-[11px] text-zinc-500">
                     Visible para todos los miembros del proyecto
                   </p>
@@ -284,6 +286,7 @@ export function ProjectChatThread({
                     {isSubmitting ? "Enviando..." : "Enviar"}
                   </button>
                 </div>
+                <button type="submit" disabled={isSubmitting} className="mb-0.5 inline-flex h-8 shrink-0 items-center justify-center rounded-lg bg-zinc-950 px-3 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? "..." : "Enviar"}</button>
               </div>
 
               {error ? <p className="text-sm text-red-600">{error}</p> : null}

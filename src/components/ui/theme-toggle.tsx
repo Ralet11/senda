@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
 
 type ThemeMode = "light" | "dark";
 
@@ -28,6 +29,7 @@ function subscribeToTheme(onStoreChange: () => void) {
 }
 
 export function ThemeToggle() {
+  const pathname = usePathname();
   const theme = useSyncExternalStore<ThemeMode>(
     subscribeToTheme,
     getThemeSnapshot,
@@ -44,6 +46,8 @@ export function ThemeToggle() {
     window.localStorage.setItem("senda-theme", nextTheme);
     window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
   }
+
+  if (pathname.endsWith("/chat") || pathname.endsWith("/assistant")) return null;
 
   return (
     <button
