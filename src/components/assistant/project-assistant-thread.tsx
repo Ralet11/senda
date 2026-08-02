@@ -142,8 +142,8 @@ export function ProjectAssistantThread({
 
   return (
     <main className="flex h-full min-h-0 flex-col">
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.35rem] border border-zinc-200 bg-white/94 shadow-sm">
-        <header className="border-b border-zinc-200 bg-gradient-to-r from-white to-teal-50/60 px-4 py-2.5">
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
+        <header className="border-b border-zinc-100 bg-white px-8 py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
@@ -164,8 +164,8 @@ export function ProjectAssistantThread({
           </div>
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col bg-zinc-100/45">
-          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <div className="flex min-h-0 flex-1 flex-col bg-white">
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
             {history.length === 0 ? (
               <div className="flex h-full min-h-[260px] items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-white/70 px-6 text-sm text-zinc-500">
                 Todavia no hay conversacion con el assistant.
@@ -225,7 +225,7 @@ export function ProjectAssistantThread({
             )}
           </div>
 
-          <div className="border-t border-zinc-200 bg-white/96 px-3 py-2">
+          <div className="border-t border-zinc-100 bg-white px-8 py-4">
             <form onSubmit={handleSubmit} className="space-y-2">
               <div className="hidden flex-wrap gap-1.5 sm:flex">
                 {quickPrompts.map((prompt) => (

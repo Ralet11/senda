@@ -66,7 +66,7 @@ export default async function ProjectChatPage({
   }
 
   return (
-    <ConversationFrame projectId={projectId} active="team"><ProjectChatThread
+    <ConversationFrame><ProjectChatThread
       projectId={projectId}
       currentUser={{
         id: user.id,

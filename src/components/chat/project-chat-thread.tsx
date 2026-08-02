@@ -153,8 +153,8 @@ export function ProjectChatThread({
 
   return (
     <main className="flex h-full min-h-0 flex-col">
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.35rem] border border-zinc-200 bg-white/94 shadow-sm">
-        <header className="border-b border-zinc-200 bg-gradient-to-r from-white to-teal-50/60 px-4 py-2.5">
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
+        <header className="border-b border-zinc-100 bg-white px-8 py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
@@ -176,8 +176,8 @@ export function ProjectChatThread({
           </div>
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col bg-zinc-100/40">
-          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <div className="flex min-h-0 flex-1 flex-col bg-white">
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
             {orderedMessages.length === 0 ? (
               <div className="flex h-full min-h-[260px] flex-col items-center justify-center px-6 text-center">
                 <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--brand-soft)] text-sm font-bold text-[var(--brand-strong)]">E</span>
@@ -254,7 +254,7 @@ export function ProjectChatThread({
             )}
           </div>
 
-          <div className="border-t border-zinc-200 bg-white/96 px-3 py-2">
+          <div className="border-t border-zinc-100 bg-white px-8 py-4">
             <form onSubmit={handleSubmit} className="space-y-2">
               <div className="flex items-end gap-2 rounded-xl border border-zinc-300 bg-[var(--surface)] px-3 py-1.5 shadow-sm focus-within:border-zinc-400">
                 <div className="hidden items-center justify-between gap-3 text-[11px]">

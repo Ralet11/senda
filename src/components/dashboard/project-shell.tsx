@@ -3,21 +3,30 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoutButton } from "@/components/ui/logout-button";
-import { ProjectNav } from "@/components/dashboard/project-nav";
 
 type ProjectNavItem = { href: string; label: string };
 type ProjectSummary = { id: string; name: string; phase: string; progress: number };
 type ProjectShellProps = { currentProjectId: string; currentProjectName: string; navItems: ProjectNavItem[]; projects: ProjectSummary[]; children: React.ReactNode };
 
-export function ProjectShell({ currentProjectId, currentProjectName, navItems, projects, children }: ProjectShellProps) {
+export function ProjectShell({ currentProjectId, currentProjectName, projects, children }: ProjectShellProps) {
   const pathname = usePathname();
   const isConversation = pathname.endsWith("/chat") || pathname.endsWith("/assistant");
-  const current = projects.find((project) => project.id === currentProjectId);
+  const teamHref = `/projects/${currentProjectId}/chat`;
+  const assistantHref = `/projects/${currentProjectId}/assistant`;
+  const summaryHref = `/projects/${currentProjectId}`;
 
-  if (isConversation) return <div className="senda-shell min-h-screen"><div className="grid min-h-screen grid-cols-[56px_minmax(0,1fr)]">
-    <aside className="flex flex-col items-center border-r bg-white/90 py-3 shadow-sm"><Link href={`/projects/${currentProjectId}`} title="Volver al resumen" className="senda-brand-mark flex h-9 w-9 items-center justify-center rounded-xl text-lg font-bold text-white">S</Link><div className="mt-6 flex flex-col gap-2"><Link title="Resumen" href={`/projects/${currentProjectId}`} className="flex h-9 w-9 items-center justify-center rounded-xl text-xs font-bold text-zinc-500 hover:bg-zinc-100">R</Link><Link title="Conversaciones" href={`/projects/${currentProjectId}/chat`} className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--navy)] text-xs font-bold text-[#61ddcf]">C</Link></div><div className="mt-auto"><LogoutButton /></div></aside>
-    <main className="min-w-0 p-2 sm:p-3">{children}</main>
+  return <div className="min-h-screen bg-[#fbfbfa] text-[#1f2933]"><div className="grid min-h-screen grid-cols-[220px_minmax(0,1fr)]">
+    <aside className="flex min-h-screen flex-col border-r border-[#e4e7e5] bg-[#f8f8f6] px-3 py-4">
+      <Link href={summaryHref} className="flex items-center gap-2 px-2"><span className="senda-brand-mark flex h-8 w-8 items-center justify-center rounded-xl text-base font-bold text-white">S</span><strong className="text-[15px] tracking-tight">senda</strong></Link>
+      <div className="mt-7 px-2"><p className="truncate text-sm font-semibold">{currentProjectName}</p><p className="mt-0.5 text-[11px] text-zinc-500">Proyecto activo</p></div>
+      <nav className="mt-5 space-y-1">
+        <Link href={summaryHref} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${!isConversation ? "bg-white font-medium shadow-sm" : "text-zinc-600 hover:bg-white"}`}><span className="text-zinc-400">◦</span>Resumen</Link>
+        <Link href={teamHref} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${isConversation ? "bg-white font-medium shadow-sm" : "text-zinc-600 hover:bg-white"}`}><span className="text-zinc-400">◦</span>Conversaciones</Link>
+      </nav>
+      {isConversation ? <div className="mt-7 border-t border-[#e4e7e5] pt-5"><p className="px-2 text-[10px] font-bold uppercase tracking-[.14em] text-zinc-400">Canales</p><div className="mt-2 space-y-1"><Link href={teamHref} className={`block rounded-lg px-3 py-2 text-sm ${pathname.endsWith("/chat") ? "bg-[#173247] text-white" : "text-zinc-600 hover:bg-white"}`}>Equipo Senda<span className={`mt-0.5 block text-[11px] ${pathname.endsWith("/chat") ? "text-slate-300" : "text-zinc-400"}`}>Canal compartido</span></Link><Link href={assistantHref} className={`block rounded-lg px-3 py-2 text-sm ${pathname.endsWith("/assistant") ? "bg-[#173247] text-white" : "text-zinc-600 hover:bg-white"}`}>Senda AI<span className={`mt-0.5 block text-[11px] ${pathname.endsWith("/assistant") ? "text-slate-300" : "text-zinc-400"}`}>Tus consultas</span></Link></div></div> : null}
+      {projects.length > 1 ? <div className="mt-7 border-t border-[#e4e7e5] pt-5"><p className="px-2 text-[10px] font-bold uppercase tracking-[.14em] text-zinc-400">Proyectos</p><div className="mt-2 space-y-1">{projects.filter((project) => project.id !== currentProjectId).map((project) => <Link key={project.id} href={`/projects/${project.id}`} className="block truncate rounded-lg px-3 py-2 text-xs text-zinc-600 hover:bg-white">{project.name}</Link>)}</div></div> : null}
+      <div className="mt-auto px-2"><LogoutButton /></div>
+    </aside>
+    <main className={isConversation ? "min-w-0" : "min-w-0 px-6 py-8 lg:px-10"}>{children}</main>
   </div></div>;
-
-  return <div className="senda-shell min-h-screen"><div className="mx-auto w-full max-w-[1320px] px-4 py-4 sm:px-6 lg:py-6"><header className="sticky top-3 z-20 rounded-2xl border bg-white/85 px-4 py-3 shadow-[0_8px_28px_rgba(21,42,59,.08)] backdrop-blur-xl sm:px-5"><div className="flex items-center gap-3"><Link href={`/projects/${currentProjectId}`} className="flex shrink-0 items-center gap-2.5"><span className="senda-brand-mark flex h-9 w-9 items-center justify-center rounded-xl text-lg font-bold text-white">S</span><strong className="hidden tracking-tight text-zinc-950 sm:block">senda</strong></Link><div className="hidden h-7 w-px bg-zinc-200 sm:block" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-zinc-950">{currentProjectName}</p><p className="text-[11px] text-zinc-500">{current?.progress ?? 0}% completado</p></div><div className="hidden xl:block"><ProjectNav items={navItems} /></div><div className="ml-auto"><LogoutButton /></div></div><div className="mt-3 border-t pt-3 xl:hidden"><ProjectNav items={navItems} /></div></header>{projects.length > 1 ? <div className="mt-4 flex flex-wrap gap-2">{projects.map((project) => <Link key={project.id} href={`/projects/${project.id}`} className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${project.id === currentProjectId ? "border-transparent bg-[var(--navy)] text-white" : "bg-white text-zinc-600 hover:border-[var(--brand)]"}`}>{project.name}</Link>)}</div> : null}<main className="mt-6 min-w-0">{children}</main></div></div>;
 }

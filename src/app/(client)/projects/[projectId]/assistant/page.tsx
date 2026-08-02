@@ -25,5 +25,5 @@ export default async function ProjectAssistantPage({
     notFound();
   }
 
-  return <ConversationFrame projectId={projectId} active="assistant"><ProjectAssistantThread projectId={projectId} initialHistory={history} /></ConversationFrame>;
+  return <ConversationFrame><ProjectAssistantThread projectId={projectId} initialHistory={history} /></ConversationFrame>;
 }
