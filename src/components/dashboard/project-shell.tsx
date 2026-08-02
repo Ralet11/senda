@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { LogoutButton } from "@/components/ui/logout-button";
 import { ProjectNav } from "@/components/dashboard/project-nav";
 
@@ -7,13 +10,14 @@ type ProjectSummary = { id: string; name: string; phase: string; progress: numbe
 type ProjectShellProps = { currentProjectId: string; currentProjectName: string; navItems: ProjectNavItem[]; projects: ProjectSummary[]; children: React.ReactNode };
 
 export function ProjectShell({ currentProjectId, currentProjectName, navItems, projects, children }: ProjectShellProps) {
+  const pathname = usePathname();
+  const isConversation = pathname.endsWith("/chat") || pathname.endsWith("/assistant");
   const current = projects.find((project) => project.id === currentProjectId);
-  return <div className="senda-shell min-h-screen"><div className="mx-auto w-full max-w-[1320px] px-4 py-4 sm:px-6 lg:py-6">
-    <header className="sticky top-3 z-20 rounded-2xl border bg-white/85 px-4 py-3 shadow-[0_8px_28px_rgba(21,42,59,.08)] backdrop-blur-xl sm:px-5">
-      <div className="flex items-center gap-3"><Link href={`/projects/${currentProjectId}`} className="flex shrink-0 items-center gap-2.5"><span className="senda-brand-mark flex h-9 w-9 items-center justify-center rounded-xl text-lg font-bold text-white">S</span><strong className="hidden tracking-tight text-zinc-950 sm:block">senda</strong></Link><div className="hidden h-7 w-px bg-zinc-200 sm:block" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-zinc-950">{currentProjectName}</p><p className="text-[11px] text-zinc-500">{current?.progress ?? 0}% completado</p></div><div className="hidden xl:block"><ProjectNav items={navItems} /></div><div className="ml-auto"><LogoutButton /></div></div>
-      <div className="mt-3 border-t pt-3 xl:hidden"><ProjectNav items={navItems} /></div>
-    </header>
-    {projects.length > 1 ? <div className="mt-4 flex flex-wrap gap-2">{projects.map((project) => <Link key={project.id} href={`/projects/${project.id}`} className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${project.id === currentProjectId ? "border-transparent bg-[var(--navy)] text-white" : "bg-white text-zinc-600 hover:border-[var(--brand)]"}`}>{project.name}</Link>)}</div> : null}
-    <main className="mt-6 min-w-0">{children}</main>
+
+  if (isConversation) return <div className="senda-shell min-h-screen"><div className="grid min-h-screen grid-cols-[56px_minmax(0,1fr)]">
+    <aside className="flex flex-col items-center border-r bg-white/90 py-3 shadow-sm"><Link href={`/projects/${currentProjectId}`} title="Volver al resumen" className="senda-brand-mark flex h-9 w-9 items-center justify-center rounded-xl text-lg font-bold text-white">S</Link><div className="mt-6 flex flex-col gap-2"><Link title="Resumen" href={`/projects/${currentProjectId}`} className="flex h-9 w-9 items-center justify-center rounded-xl text-xs font-bold text-zinc-500 hover:bg-zinc-100">R</Link><Link title="Conversaciones" href={`/projects/${currentProjectId}/chat`} className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--navy)] text-xs font-bold text-[#61ddcf]">C</Link></div><div className="mt-auto"><LogoutButton /></div></aside>
+    <main className="min-w-0 p-2 sm:p-3">{children}</main>
   </div></div>;
+
+  return <div className="senda-shell min-h-screen"><div className="mx-auto w-full max-w-[1320px] px-4 py-4 sm:px-6 lg:py-6"><header className="sticky top-3 z-20 rounded-2xl border bg-white/85 px-4 py-3 shadow-[0_8px_28px_rgba(21,42,59,.08)] backdrop-blur-xl sm:px-5"><div className="flex items-center gap-3"><Link href={`/projects/${currentProjectId}`} className="flex shrink-0 items-center gap-2.5"><span className="senda-brand-mark flex h-9 w-9 items-center justify-center rounded-xl text-lg font-bold text-white">S</span><strong className="hidden tracking-tight text-zinc-950 sm:block">senda</strong></Link><div className="hidden h-7 w-px bg-zinc-200 sm:block" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-zinc-950">{currentProjectName}</p><p className="text-[11px] text-zinc-500">{current?.progress ?? 0}% completado</p></div><div className="hidden xl:block"><ProjectNav items={navItems} /></div><div className="ml-auto"><LogoutButton /></div></div><div className="mt-3 border-t pt-3 xl:hidden"><ProjectNav items={navItems} /></div></header>{projects.length > 1 ? <div className="mt-4 flex flex-wrap gap-2">{projects.map((project) => <Link key={project.id} href={`/projects/${project.id}`} className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${project.id === currentProjectId ? "border-transparent bg-[var(--navy)] text-white" : "bg-white text-zinc-600 hover:border-[var(--brand)]"}`}>{project.name}</Link>)}</div> : null}<main className="mt-6 min-w-0">{children}</main></div></div>;
 }
