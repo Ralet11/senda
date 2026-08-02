@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { readChatImage } from "@/lib/chat-attachments";
+import { persistGeneratedChatImage, readChatImage, removeChatImage } from "@/lib/chat-attachments";
 import { researchProjectRepo, type RepoResearchResult } from "@/lib/project-repo";
 import {
   embedProjectContextChunks,
@@ -450,6 +450,35 @@ async function buildImageInputParts(attachments: AssistantImageAttachment[]): Pr
   );
 }
 
+async function generateVisualProposal(message: string, attachment: AssistantImageAttachment) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY_MISSING");
+  const source = await readChatImage(attachment.storageKey);
+  if (!source) throw new Error("ASSISTANT_IMAGE_MISSING");
+
+  const prompt = [
+    "Crea una propuesta visual mejorada a partir de la imagen de referencia.",
+    "Conserva la intención y la jerarquía funcional, pero mejora claridad, composición, espaciado y aspecto profesional.",
+    "No incluyas texto inventado, marcas de agua, credenciales, código ni información sensible.",
+    `Pedido del cliente: ${message}`,
+  ].join("\n");
+  const form = new FormData();
+  form.set("model", "gpt-image-2");
+  form.set("prompt", prompt);
+  form.set("size", "1536x1024");
+  form.set("image", new Blob([source], { type: attachment.mimeType }), attachment.fileName);
+
+  const response = await fetch("https://api.openai.com/v1/images/edits", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: form,
+  });
+  const data = await response.json().catch(() => null) as { data?: Array<{ b64_json?: string }>; error?: { message?: string } } | null;
+  const encoded = data?.data?.[0]?.b64_json;
+  if (!response.ok || !encoded) throw new Error(data?.error?.message || "VISUAL_GENERATION_FAILED");
+  return Buffer.from(encoded, "base64");
+}
+
 async function getRecentConversation(projectId: string, assistantSessionId: string) {
   const chunks = await prisma.projectContextChunk.findMany({
     where: {
@@ -504,7 +533,7 @@ export async function createAssistantReply(
   projectId: string,
   assistantSessionId: string,
   message: string,
-  input: { uploadedById: string; attachments: AssistantImageAttachment[] },
+  input: { uploadedById: string; attachments: AssistantImageAttachment[]; generateVisual?: boolean },
 ) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -596,6 +625,11 @@ export async function createAssistantReply(
   ];
 
   const reply = await callOpenAIResponse(messages);
+  const generatedImage = input.generateVisual && input.attachments[0]
+    ? await generateVisualProposal(message, input.attachments[0])
+    : null;
+  let generatedStorageKey: string | null = null;
+  if (generatedImage) generatedStorageKey = await persistGeneratedChatImage(generatedImage);
 
   const result = await prisma.$transaction(async (tx) => {
     const userChunk = await tx.projectContextChunk.create({
@@ -615,6 +649,21 @@ export async function createAssistantReply(
         content: reply,
       },
     });
+
+    const generatedAttachment = generatedStorageKey
+      ? await tx.chatAttachment.create({
+          data: {
+            projectId,
+            uploadedById: input.uploadedById,
+            assistantContextChunkId: replyChunk.id,
+            storageKey: generatedStorageKey,
+            fileName: "propuesta-visual.png",
+            mimeType: "image/png",
+            sizeBytes: generatedImage!.length,
+          },
+          select: { id: true, fileName: true, mimeType: true, sizeBytes: true },
+        })
+      : null;
 
     if (input.attachments.length > 0) {
       const attached = await tx.chatAttachment.updateMany({
@@ -651,7 +700,10 @@ export async function createAssistantReply(
       select: { id: true, fileName: true, mimeType: true, sizeBytes: true },
     });
 
-    return { userChunk, replyChunk, proposal, userAttachments };
+    return { userChunk, replyChunk, proposal, userAttachments, generatedAttachment };
+  }).catch(async (error) => {
+    if (generatedStorageKey) await removeChatImage(generatedStorageKey);
+    throw error;
   });
 
   try {
@@ -682,6 +734,7 @@ export async function createAssistantReply(
         used: technicalResearch.usedEvidence,
         evidenceCount: technicalResearch.evidenceCount,
       },
+      attachments: result.generatedAttachment ? [{ ...result.generatedAttachment, url: `/api/chat/attachments/${result.generatedAttachment.id}` }] : [],
     },
     userMessage: {
       id: result.userChunk.id,

@@ -52,6 +52,15 @@ export async function persistChatImage(file: File) {
   return storageKey;
 }
 
+export async function persistGeneratedChatImage(content: Buffer) {
+  if (content.length === 0 || content.length > MAX_IMAGE_BYTES) throw new Error("INVALID_GENERATED_IMAGE");
+  const storageKey = `${randomUUID()}.png`;
+  const root = getChatUploadsRoot();
+  await fs.mkdir(/* turbopackIgnore: true */ root, { recursive: true });
+  await fs.writeFile(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ root, storageKey), content, { flag: "wx" });
+  return storageKey;
+}
+
 export async function removeChatImage(storageKey: string) {
   if (!/^[0-9a-f-]{36}\.(jpg|png|webp|gif)$/.test(storageKey)) return;
   await fs.unlink(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ getChatUploadsRoot(), storageKey)).catch(() => undefined);

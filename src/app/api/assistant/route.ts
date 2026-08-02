@@ -12,6 +12,7 @@ export async function POST(request: Request) {
   const projectId = typeof body?.projectId === "string" ? body.projectId.trim() : "";
   const sessionId = typeof body?.sessionId === "string" ? body.sessionId.trim() : "";
   const message = typeof body?.message === "string" ? body.message.trim() : "";
+  const generateVisual = body?.generateVisual === true;
   const attachmentIds: string[] = [];
   if (Array.isArray(body?.attachmentIds)) {
     for (const candidate of body.attachmentIds) {
@@ -27,6 +28,9 @@ export async function POST(request: Request) {
 
   if (projectId.length > 128 || message.length > MAX_MESSAGE_LENGTH || attachmentIds.length > MAX_ASSISTANT_IMAGES) {
     return NextResponse.json({ error: "La consulta supera el maximo de 4000 caracteres o 2 imagenes." }, { status: 400 });
+  }
+  if (generateVisual && attachmentIds.length === 0) {
+    return NextResponse.json({ error: "Adjunta una imagen de referencia para generar una propuesta visual." }, { status: 400 });
   }
 
   const user = await requireProjectMember(projectId);
@@ -67,6 +71,7 @@ export async function POST(request: Request) {
     const result = await createAssistantReply(projectId, sessionId, message, {
       uploadedById: user.id,
       attachments,
+      generateVisual,
     });
     return NextResponse.json(result);
   } catch (error) {
