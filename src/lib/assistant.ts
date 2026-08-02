@@ -343,6 +343,23 @@ async function analyzeTechnicalResearch(question: string, repoResearch: RepoRese
   }
 }
 
+function buildVerifiedTechnicalReply(research: TechnicalResearch) {
+  if (!research.usedEvidence) {
+    return `${research.summary} No voy a completar esa respuesta con supuestos.`;
+  }
+
+  const findings = research.summary
+    .split("\n")
+    .map((finding) => finding.trim())
+    .filter(Boolean);
+
+  return [
+    "Según la implementación actual:",
+    "",
+    ...findings.map((finding) => `- ${finding}`),
+  ].join("\n");
+}
+
 function buildSemanticContextBlock(results: SemanticContextResult[]) {
   if (results.length === 0) {
     return "No hay contexto semántico indexado todavía para este proyecto.";
@@ -605,7 +622,7 @@ export async function createAssistantReply(
     ? repositoryAccessQuestion
       ? {
           attempted: true,
-          usedEvidence: false,
+          usedEvidence: repoResearch.repoAvailable,
           evidenceCount: 0,
           summary: repoResearch.repoAvailable
             ? "El repositorio configurado esta disponible para investigacion tecnica en esta consulta."
@@ -647,7 +664,9 @@ export async function createAssistantReply(
     },
   ];
 
-  const reply = await callOpenAIResponse(messages);
+  const reply = technicalResearch.attempted
+    ? buildVerifiedTechnicalReply(technicalResearch)
+    : await callOpenAIResponse(messages);
   const generatedImage = input.generateVisual
     ? await generateVisualProposal(message, input.attachments[0])
     : null;
