@@ -339,30 +339,22 @@ export default async function ProjectDashboardPage({
             {project.milestones.length === 0 ? (
               <p className="text-sm text-zinc-500">No hay hitos cargados todavia.</p>
             ) : (
-              <div className="space-y-3">
-                {project.milestones.map((milestone) => (
-                  <div
-                    key={milestone.id}
-                    className="flex flex-col gap-3 rounded-md border border-zinc-200 bg-zinc-100/45 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-medium text-zinc-900">{milestone.title}</p>
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                            milestone.doneAt
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-amber-50 text-amber-700"
-                          }`}
-                        >
-                          {milestone.doneAt ? "Completado" : "Pendiente"}
-                        </span>
+              <div className="relative ml-2 border-l border-[var(--border-soft)] pl-6">
+                {project.milestones.map((milestone, index) => (
+                  <div key={milestone.id} className={index === project.milestones.length - 1 ? "relative pb-0" : "relative pb-6"}>
+                    <span className={`absolute -left-[2.02rem] top-1.5 flex h-4 w-4 items-center justify-center rounded-full border-4 border-[var(--surface)] ${milestone.doneAt ? "bg-[var(--brand)]" : "bg-amber-400"}`} />
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold text-zinc-900">{milestone.title}</p>
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${milestone.doneAt ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                            {milestone.doneAt ? "Completado" : "Pendiente"}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm text-zinc-600">
+                          {milestone.doneAt ? `Cerrado el ${formatDate(milestone.doneAt)}` : `Fecha estimada: ${formatDate(milestone.dueDate)}`}
+                        </p>
                       </div>
-                      <p className="text-sm text-zinc-600">
-                        {milestone.doneAt
-                          ? `Cerrado el ${formatDate(milestone.doneAt)}`
-                          : `Fecha estimada: ${formatDate(milestone.dueDate)}`}
-                      </p>
                     </div>
                   </div>
                 ))}
@@ -429,16 +421,11 @@ export default async function ProjectDashboardPage({
             {latestActivity.length === 0 ? (
               <p className="text-sm text-zinc-500">Todavia no hay actividad registrada.</p>
             ) : (
-              <div className="space-y-3">
+              <div className="divide-y divide-[var(--border-soft)] rounded-xl border border-[var(--border-soft)] bg-[var(--surface-muted)]/40">
                 {latestActivity.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="rounded-md border border-zinc-200 bg-zinc-100/45 px-4 py-4"
-                  >
-                    <p className="text-sm text-zinc-900">{entry.message}</p>
-                    <p className="mt-2 text-xs text-zinc-500">
-                      {formatDate(entry.createdAt)}
-                    </p>
+                  <div key={entry.id} className="grid gap-2 px-4 py-4 sm:grid-cols-[5.5rem_minmax(0,1fr)] sm:gap-4">
+                    <p className="text-xs font-medium text-[var(--brand-strong)]">{formatDate(entry.createdAt)}</p>
+                    <p className="text-sm leading-6 text-zinc-900">{entry.message}</p>
                   </div>
                 ))}
               </div>
