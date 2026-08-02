@@ -240,7 +240,7 @@ export function ProjectAssistantThread({
                 ))}
               </div>
 
-              <div className="rounded-xl border border-zinc-300 bg-[var(--surface)] px-3 py-2 shadow-sm focus-within:border-zinc-400">
+              <div className="flex items-end gap-2 rounded-xl border border-zinc-300 bg-[var(--surface)] px-3 py-1.5 shadow-sm focus-within:border-zinc-400">
                 <div className="hidden items-center justify-between gap-3 text-[10px]">
                   <p className="text-zinc-500">Preguntá por avances o funcionamiento.</p>
                   <p className="rounded-full bg-[var(--brand-soft)] px-2 py-0.5 font-medium text-[var(--brand-strong)]">
@@ -255,7 +255,7 @@ export function ProjectAssistantThread({
                   rows={1}
                   required
                   placeholder="Escribi tu pregunta..."
-                  className="min-h-[34px] max-h-28 w-full resize-none bg-transparent py-1 text-sm leading-5 text-zinc-900 outline-none placeholder:text-zinc-500"
+                  className="min-h-[34px] max-h-28 flex-1 resize-none bg-transparent py-1.5 text-sm leading-5 text-zinc-900 outline-none placeholder:text-zinc-500"
                 />
 
                 {proposal ? (
@@ -266,7 +266,7 @@ export function ProjectAssistantThread({
 
                 {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
 
-                <div className="mt-1 flex items-center justify-end gap-3 border-t border-zinc-200 pt-1">
+                <div className="hidden mt-1 flex items-center justify-end gap-3 border-t border-zinc-200 pt-1">
                   <p className="hidden text-[10px] text-zinc-500">Contexto del proyecto cuando haga falta.</p>
                   <button
                     type="submit"
@@ -276,6 +276,7 @@ export function ProjectAssistantThread({
                     {isSubmitting ? "Consultando..." : "Preguntar"}
                   </button>
                 </div>
+                <button type="submit" disabled={isSubmitting} className="mb-0.5 inline-flex h-8 shrink-0 items-center justify-center rounded-lg bg-zinc-950 px-3 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? "..." : "Enviar"}</button>
               </div>
             </form>
           </div>
