@@ -15,6 +15,7 @@ const MAX_FILE_SIZE_BYTES = 256 * 1024;
 const MAX_CANDIDATE_FILES = 250;
 const MAX_EVIDENCE_FILES = 8;
 const MAX_EVIDENCE_CHARS = 1_400;
+const MAX_SENDA_KNOWLEDGE_FILES = 32;
 
 export type RepoResearchEvidence = {
   /** Internal-only. Never send this object to the browser. */
@@ -113,8 +114,41 @@ export function resolveProjectRepoPath(repoLocalPath: string | null) {
   return resolved;
 }
 
-async function collectCandidateFiles(repoPath: string) {
+async function collectSendaKnowledgeFiles(repoPath: string) {
+  const knowledgeRoot = path.join(/* turbopackIgnore: true */ repoPath, ".senda");
   const collected: string[] = [];
+  const queue = [knowledgeRoot];
+
+  while (queue.length && collected.length < MAX_SENDA_KNOWLEDGE_FILES) {
+    const current = queue.shift();
+    if (!current) break;
+    const entries = await fs.readdir(/* turbopackIgnore: true */ current, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      const fullPath = path.join(/* turbopackIgnore: true */ current, entry.name);
+      if (entry.isDirectory()) {
+        if (!IGNORED_DIRECTORIES.has(entry.name)) queue.push(fullPath);
+        continue;
+      }
+      const relativePath = path.relative(/* turbopackIgnore: true */ repoPath, fullPath);
+      if (entry.isFile() && TEXT_EXTENSIONS.has(path.extname(entry.name).toLowerCase()) && isAllowedFile(relativePath)) {
+        collected.push(fullPath);
+      }
+      if (collected.length >= MAX_SENDA_KNOWLEDGE_FILES) break;
+    }
+  }
+
+  return collected;
+}
+
+async function collectCandidateFiles(repoPath: string, preferredFiles: string[] = []) {
+  const collected: string[] = [];
+  for (const filePath of preferredFiles) {
+    const relativePath = path.relative(/* turbopackIgnore: true */ repoPath, filePath);
+    const stat = await fs.stat(/* turbopackIgnore: true */ filePath).catch(() => null);
+    if (stat?.isFile() && TEXT_EXTENSIONS.has(path.extname(filePath).toLowerCase()) && isAllowedFile(relativePath)) {
+      collected.push(filePath);
+    }
+  }
   const queue = [repoPath];
   while (queue.length && collected.length < MAX_CANDIDATE_FILES) {
     const current = queue.shift();
@@ -127,7 +161,7 @@ async function collectCandidateFiles(repoPath: string) {
         continue;
       }
       const relativePath = path.relative(/* turbopackIgnore: true */ repoPath, fullPath);
-      if (entry.isFile() && TEXT_EXTENSIONS.has(path.extname(entry.name).toLowerCase()) && isAllowedFile(relativePath)) {
+      if (entry.isFile() && TEXT_EXTENSIONS.has(path.extname(entry.name).toLowerCase()) && isAllowedFile(relativePath) && !collected.includes(fullPath)) {
         collected.push(fullPath);
       }
       if (collected.length >= MAX_CANDIDATE_FILES) break;
@@ -181,7 +215,8 @@ export async function researchProjectRepo(params: { repoLocalPath: string | null
   const terms = normalizeQueryTerms(params.question);
   if (!terms.length) return { repoAvailable: true, reason: null, filesScanned: 0, evidence: [] };
 
-  const files = await collectCandidateFiles(repoPath);
+  const knowledgeFiles = await collectSendaKnowledgeFiles(repoPath);
+  const files = await collectCandidateFiles(repoPath, knowledgeFiles);
   const contents = new Map<string, string>();
   const scored: Array<{ filePath: string; score: number }> = [];
   for (const filePath of files) {
@@ -190,7 +225,8 @@ export async function researchProjectRepo(params: { repoLocalPath: string | null
     const content = await fs.readFile(/* turbopackIgnore: true */ filePath, "utf8").catch(() => null);
     if (content === null) continue;
     contents.set(filePath, content);
-    const score = scoreFile(path.relative(/* turbopackIgnore: true */ repoPath, filePath), content, terms);
+    const relativePath = path.relative(/* turbopackIgnore: true */ repoPath, filePath);
+    const score = scoreFile(relativePath, content, terms) + (relativePath.startsWith(".senda") ? 2 : 0);
     if (score > 0) scored.push({ filePath, score });
   }
   scored.sort((a, b) => b.score - a.score);

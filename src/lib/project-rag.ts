@@ -226,6 +226,7 @@ export async function searchProjectContext(input: {
       SELECT 1
       FROM "ProjectContextChunk"
       WHERE "projectId" = ${input.projectId}
+        AND "source" NOT IN ('assistant_user', 'assistant_reply')
         AND "embedding" IS NOT NULL
     ) AS "exists"
   `;
@@ -241,6 +242,7 @@ export async function searchProjectContext(input: {
       1 - ("embedding" <=> ${vectorLiteral(embedding)}::vector) AS "similarity"
     FROM "ProjectContextChunk"
     WHERE "projectId" = ${input.projectId}
+      AND "source" NOT IN ('assistant_user', 'assistant_reply')
       AND "embedding" IS NOT NULL
     ORDER BY "embedding" <=> ${vectorLiteral(embedding)}::vector
     LIMIT ${limit}

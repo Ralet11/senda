@@ -2,11 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { persistGeneratedChatImage, readChatImage, removeChatImage } from "@/lib/chat-attachments";
 import { researchProjectRepo, type RepoResearchResult } from "@/lib/project-repo";
-import {
-  embedProjectContextChunks,
-  searchProjectContext,
-  type SemanticContextResult,
-} from "@/lib/project-rag";
+import { searchProjectContext, type SemanticContextResult } from "@/lib/project-rag";
 
 type AssistantHistoryItem = {
   id: string;
@@ -739,24 +735,6 @@ export async function createAssistantReply(
     if (generatedStorageKey) await removeChatImage(generatedStorageKey);
     throw error;
   });
-
-  try {
-    await embedProjectContextChunks([
-      {
-        id: result.userChunk.id,
-        source: result.userChunk.source,
-        content: result.userChunk.content,
-      },
-      {
-        id: result.replyChunk.id,
-        source: result.replyChunk.source,
-        content: result.replyChunk.content,
-      },
-    ]);
-  } catch (error) {
-    // The reply is already persisted; a later manual reindex can recover this context.
-    console.error("assistant context embedding failed", error);
-  }
 
   return {
     reply: {
