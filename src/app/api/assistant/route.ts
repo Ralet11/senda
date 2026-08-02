@@ -29,9 +29,6 @@ export async function POST(request: Request) {
   if (projectId.length > 128 || message.length > MAX_MESSAGE_LENGTH || attachmentIds.length > MAX_ASSISTANT_IMAGES) {
     return NextResponse.json({ error: "La consulta supera el maximo de 4000 caracteres o 2 imagenes." }, { status: 400 });
   }
-  if (generateVisual && attachmentIds.length === 0) {
-    return NextResponse.json({ error: "Adjunta una imagen de referencia para generar una propuesta visual." }, { status: 400 });
-  }
 
   const user = await requireProjectMember(projectId);
   const session = await prisma.assistantSession.findFirst({

@@ -125,10 +125,7 @@ export function ProjectAssistantThread({
     event.preventDefault();
 
     const trimmed = message.trim();
-    if (!trimmed || (generateVisual && selectedImages.length === 0)) {
-      if (generateVisual && selectedImages.length === 0) setError("Adjunta una imagen de referencia para generar una propuesta visual.");
-      return;
-    }
+    if (!trimmed) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -339,7 +336,7 @@ export function ProjectAssistantThread({
 
                 <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple className="sr-only" onChange={(event) => selectImages(event.target.files)} />
                 <button type="button" onClick={() => imageInputRef.current?.click()} disabled={isSubmitting || selectedImages.length >= 2} className="mb-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-zinc-200 text-lg text-zinc-600 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Adjuntar imagen" title="Adjuntar imagen">+</button>
-                <button type="button" onClick={() => setGenerateVisual((enabled) => !enabled)} disabled={isSubmitting} className={`mb-0.5 inline-flex h-8 shrink-0 items-center rounded-lg border px-2 text-[11px] font-medium transition ${generateVisual ? "border-teal-600 bg-teal-50 text-teal-700" : "border-zinc-200 text-zinc-600 hover:border-zinc-400"}`} title="Generar una propuesta visual a partir de la imagen adjunta">Visual</button>
+                <button type="button" onClick={() => setGenerateVisual((enabled) => !enabled)} disabled={isSubmitting} className={`mb-0.5 inline-flex h-8 shrink-0 items-center rounded-lg border px-2 text-[11px] font-medium transition ${generateVisual ? "border-teal-600 bg-teal-50 text-teal-700" : "border-zinc-200 text-zinc-600 hover:border-zinc-400"}`} title="Generar una propuesta visual desde tu texto o una imagen de referencia">Visual</button>
 
                 <div className="hidden mt-1 flex items-center justify-end gap-3 border-t border-zinc-200 pt-1">
                   <p className="hidden text-[10px] text-zinc-500">Contexto del proyecto cuando haga falta.</p>

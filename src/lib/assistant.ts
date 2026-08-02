@@ -450,29 +450,32 @@ async function buildImageInputParts(attachments: AssistantImageAttachment[]): Pr
   );
 }
 
-async function generateVisualProposal(message: string, attachment: AssistantImageAttachment) {
+async function generateVisualProposal(message: string, attachment?: AssistantImageAttachment) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY_MISSING");
-  const source = await readChatImage(attachment.storageKey);
-  if (!source) throw new Error("ASSISTANT_IMAGE_MISSING");
-
   const prompt = [
-    "Crea una propuesta visual mejorada a partir de la imagen de referencia.",
-    "Conserva la intención y la jerarquía funcional, pero mejora claridad, composición, espaciado y aspecto profesional.",
+    attachment ? "Crea una propuesta visual mejorada a partir de la imagen de referencia." : "Crea una propuesta visual original a partir de la descripción del cliente.",
+    "Prioriza claridad, composición, espaciado y un aspecto profesional.",
     "No incluyas texto inventado, marcas de agua, credenciales, código ni información sensible.",
     `Pedido del cliente: ${message}`,
   ].join("\n");
-  const form = new FormData();
-  form.set("model", "gpt-image-2");
-  form.set("prompt", prompt);
-  form.set("size", "1536x1024");
-  form.set("image", new Blob([source], { type: attachment.mimeType }), attachment.fileName);
-
-  const response = await fetch("https://api.openai.com/v1/images/edits", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body: form,
-  });
+  let response: Response;
+  if (attachment) {
+    const source = await readChatImage(attachment.storageKey);
+    if (!source) throw new Error("ASSISTANT_IMAGE_MISSING");
+    const form = new FormData();
+    form.set("model", "gpt-image-2");
+    form.set("prompt", prompt);
+    form.set("size", "1536x1024");
+    form.set("image", new Blob([source], { type: attachment.mimeType }), attachment.fileName);
+    response = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { Authorization: `Bearer ${apiKey}` }, body: form });
+  } else {
+    response = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: "gpt-image-2", prompt, size: "1536x1024" }),
+    });
+  }
   const data = await response.json().catch(() => null) as { data?: Array<{ b64_json?: string }>; error?: { message?: string } } | null;
   const encoded = data?.data?.[0]?.b64_json;
   if (!response.ok || !encoded) throw new Error(data?.error?.message || "VISUAL_GENERATION_FAILED");
@@ -625,7 +628,7 @@ export async function createAssistantReply(
   ];
 
   const reply = await callOpenAIResponse(messages);
-  const generatedImage = input.generateVisual && input.attachments[0]
+  const generatedImage = input.generateVisual
     ? await generateVisualProposal(message, input.attachments[0])
     : null;
   let generatedStorageKey: string | null = null;
