@@ -106,7 +106,7 @@ export default async function ProjectDashboardPage({
             </div>
           </div>
 
-          <div className="grid w-full max-w-sm gap-4 rounded-2xl border border-white/30 bg-slate-50/95 p-4 shadow-xl shadow-slate-950/10">
+          <div className="senda-project-hero-panel grid w-full max-w-sm gap-4 rounded-2xl border border-white/30 bg-slate-50/95 p-4 shadow-xl shadow-slate-950/10">
             <div className="grid grid-cols-[64px_minmax(0,1fr)] items-center gap-4 rounded-xl border border-slate-200 bg-slate-100 px-3 py-3">
               <div className="relative h-14 w-14 rounded-full border border-slate-200 bg-slate-50">
                 <div
