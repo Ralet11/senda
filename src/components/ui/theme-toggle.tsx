@@ -28,7 +28,7 @@ function subscribeToTheme(onStoreChange: () => void) {
   };
 }
 
-export function ThemeToggle({ embedded = false }: { embedded?: boolean }) {
+export function ThemeToggle({ embedded = false, menu = false }: { embedded?: boolean; menu?: boolean }) {
   const pathname = usePathname();
   const theme = useSyncExternalStore<ThemeMode>(
     subscribeToTheme,
@@ -54,7 +54,7 @@ export function ThemeToggle({ embedded = false }: { embedded?: boolean }) {
       type="button"
       onClick={handleToggle}
       disabled={!ready}
-      className={`${embedded ? "w-full justify-center" : "fixed bottom-4 right-4 z-50 lg:bottom-6 lg:right-6"} senda-theme-toggle inline-flex h-10 items-center gap-2 rounded-xl border border-zinc-300 bg-white/95 px-3 text-sm font-medium text-zinc-800 shadow-lg backdrop-blur disabled:opacity-60`}
+      className={`${menu ? "w-full justify-between rounded-lg shadow-none" : embedded ? "w-full justify-center" : "fixed bottom-4 right-4 z-50 lg:bottom-6 lg:right-6"} senda-theme-toggle inline-flex h-10 items-center gap-2 rounded-xl border border-zinc-300 bg-white/95 px-3 text-sm font-medium text-zinc-800 shadow-lg backdrop-blur disabled:opacity-60`}
       aria-label={theme === "light" ? "Cambiar a modo oscuro" : "Cambiar a modo claro"}
     >
       <span aria-hidden="true">{theme === "light" ? "◐" : "◑"}</span>

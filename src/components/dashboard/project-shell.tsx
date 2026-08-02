@@ -12,10 +12,10 @@ type AssistantSessionSummary = { id: string; title: string };
 type ProjectShellProps = {
   currentProjectId: string; currentProjectName: string; projects: ProjectSummary[];
   directConversations: ConversationSummary[]; assistantSessions: AssistantSessionSummary[];
-  availableMembers: Array<{ id: string; name: string }>; children: React.ReactNode;
+  availableMembers: Array<{ id: string; name: string }>; currentUser: { name: string; email: string }; children: React.ReactNode;
 };
 
-export function ProjectShell({ currentProjectId, currentProjectName, projects, directConversations, assistantSessions, availableMembers, children }: ProjectShellProps) {
+export function ProjectShell({ currentProjectId, currentProjectName, projects, directConversations, assistantSessions, availableMembers, currentUser, children }: ProjectShellProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isConversation = pathname.endsWith("/chat") || pathname.endsWith("/assistant");
@@ -25,6 +25,7 @@ export function ProjectShell({ currentProjectId, currentProjectName, projects, d
   const [showDirectPicker, setShowDirectPicker] = useState(false);
   const [selectedMember, setSelectedMember] = useState(availableMembers[0]?.id ?? "");
   const [isCreatingDirect, setIsCreatingDirect] = useState(false);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
 
   async function createDirectConversation() {
     if (!selectedMember) return;
@@ -52,7 +53,10 @@ export function ProjectShell({ currentProjectId, currentProjectName, projects, d
         </div></section>
         {projects.length > 1 ? <section className="mt-7 border-t border-[var(--border-soft)] pt-5"><p className="px-2 text-[10px] font-bold uppercase tracking-[.14em] text-zinc-400">Otros proyectos</p><div className="mt-2 space-y-1">{projects.filter((project) => project.id !== currentProjectId).map((project) => <Link key={project.id} href={`/projects/${project.id}`} className="block truncate rounded-lg px-3 py-2 text-xs text-zinc-600 hover:bg-[var(--surface-strong)]">{project.name}</Link>)}</div></section> : null}
       </div>
-      <div className="shrink-0 space-y-2 border-t border-[var(--border-soft)] px-2 pt-3"><ThemeToggle embedded /><LogoutButton /></div>
+      <div className="relative shrink-0 border-t border-[var(--border-soft)] px-2 pt-3">
+        {showAccountMenu ? <div className="absolute bottom-[calc(100%+10px)] left-2 right-2 rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] p-2 shadow-xl"><div className="border-b border-[var(--border-soft)] px-2 pb-2"><p className="truncate text-xs font-semibold">{currentUser.name}</p><p className="truncate text-[11px] text-zinc-500">{currentUser.email}</p></div><div className="mt-2 space-y-1"><ThemeToggle menu /><LogoutButton menu /></div></div> : null}
+        <button type="button" onClick={() => setShowAccountMenu((open) => !open)} className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left transition hover:bg-[var(--surface-strong)]" aria-expanded={showAccountMenu}><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1b5361] text-xs font-bold text-white">{currentUser.name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</span><span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{currentUser.name}</span><span className="block truncate text-[11px] text-zinc-500">Cuenta y preferencias</span></span><span className="text-xs text-zinc-400">{showAccountMenu ? "⌃" : "⌄"}</span></button>
+      </div>
     </aside>
     <main className={isConversation ? "h-screen min-w-0 overflow-y-auto" : "h-screen min-w-0 overflow-y-auto px-6 py-8 lg:px-10"}>{children}</main>
   </div></div>;

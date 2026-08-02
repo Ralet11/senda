@@ -48,6 +48,7 @@ export default async function ProjectLayout({
       }))}
       assistantSessions={assistantSessions}
       availableMembers={members.map((member) => member.user)}
+      currentUser={{ name: user.name, email: user.email }}
     >
       {children}
     </ProjectShell>
