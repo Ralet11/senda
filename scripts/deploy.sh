@@ -70,6 +70,15 @@ PREVIOUS_COMMIT="$(git rev-parse HEAD)"
 TARGET_COMMIT="$(git rev-parse origin/main)"
 
 if [[ "$PREVIOUS_COMMIT" == "$TARGET_COMMIT" ]]; then
+  if [[ "${SENDA_RELOAD_ENV:-}" == "1" ]]; then
+    log "No hay cambios de codigo; recargando la configuracion de Senda."
+    pm2 restart senda --update-env
+    sleep 5
+    curl -fsS --connect-timeout 10 http://127.0.0.1:3010/login > /dev/null
+    pm2 save
+    log "Configuracion de Senda recargada."
+    exit 0
+  fi
   log "Senda ya esta en $PREVIOUS_COMMIT. No hay cambios para desplegar."
   exit 0
 fi
