@@ -232,8 +232,13 @@ export function ProjectAssistantThread({
         <div className="flex min-h-0 flex-1 flex-col bg-white">
           <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
             {history.length === 0 ? (
-              <div className="flex h-full min-h-[260px] items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-white/70 px-6 text-sm text-zinc-500">
-                Todavia no hay conversacion con el assistant.
+              <div className="flex h-full min-h-[260px] items-center justify-center px-6">
+                <div className="max-w-md text-center">
+                  <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--brand-soft)] text-lg font-bold text-[var(--brand-strong)]">S</span>
+                  <h2 className="mt-4 text-lg font-semibold text-zinc-900">¿Qué querés resolver hoy?</h2>
+                  <p className="mt-2 text-sm leading-6 text-zinc-500">Preguntá por el proyecto, adjuntá una referencia o activá Visual para crear una propuesta desde una idea.</p>
+                  <div className="mt-5 flex flex-wrap justify-center gap-2 text-xs text-zinc-600"><span className="rounded-full border border-[var(--border-soft)] bg-[var(--surface)] px-3 py-1.5">Explicame cómo funciona</span><span className="rounded-full border border-[var(--border-soft)] bg-[var(--surface)] px-3 py-1.5">Creá una propuesta visual</span></div>
+                </div>
               </div>
             ) : (
               <div className="space-y-2">
