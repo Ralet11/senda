@@ -134,12 +134,6 @@ export function ProjectAssistantThread({
     setProposal(data.proposal ?? null);
   }
 
-  const quickPrompts = [
-    "Resumime el estado actual",
-    "Que se hizo esta semana",
-    "Que sigue ahora",
-  ];
-
   return (
     <main className="flex h-full min-h-0 flex-col">
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
@@ -226,20 +220,7 @@ export function ProjectAssistantThread({
           </div>
 
           <div className="border-t border-zinc-100 bg-white px-8 py-4">
-            <form onSubmit={handleSubmit} className="space-y-2">
-              <div className="hidden flex-wrap gap-1.5 sm:flex">
-                {quickPrompts.map((prompt) => (
-                  <button
-                    key={prompt}
-                    type="button"
-                    onClick={() => setMessage(prompt)}
-                    className="rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 text-[10px] font-medium text-zinc-700 transition-colors hover:bg-zinc-200"
-                  >
-                    {prompt}
-                  </button>
-                ))}
-              </div>
-
+            <form onSubmit={handleSubmit}>
               <div className="flex items-end gap-2 rounded-xl border border-zinc-300 bg-[var(--surface)] px-3 py-1.5 shadow-sm focus-within:border-zinc-400">
                 <div className="hidden items-center justify-between gap-3 text-[10px]">
                   <p className="text-zinc-500">Preguntá por avances o funcionamiento.</p>
