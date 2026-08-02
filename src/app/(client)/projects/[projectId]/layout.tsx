@@ -37,17 +37,11 @@ export default async function ProjectLayout({
     return <>{children}</>;
   }
 
-  const navItems = [
-    { href: `/projects/${projectId}`, label: "Resumen" },
-    { href: `/projects/${projectId}/chat`, label: "Conversaciones" },
-  ];
-
   return (
     <ProjectShell
       currentProjectId={projectId}
       currentProjectName={project.name}
       projects={projects}
-      navItems={navItems}
       directConversations={directConversations.map((conversation) => ({
         id: conversation.id,
         label: conversation.members.find((member) => member.user.id !== user.id)?.user.name ?? "Conversación directa",
