@@ -91,6 +91,20 @@ function isRepositoryAccessRequest(message: string) {
   return /\b(acceso|repo|repositorio)\b/.test(normalized) && /\b(podes|puedes|tengo|tenes|tienes|hay|acceder)\b/.test(normalized);
 }
 
+function classifyObviousIntent(message: string): IntentDecision | null {
+  const normalized = normalizeText(message);
+  if (/\b(de que consta|que hace|funcionalidades|funciones principales|features principales|modulos|capacidades)\b/.test(normalized)) {
+    return { intent: "PROJECT_FACT", confidence: "high", factScope: "CAPABILITIES" };
+  }
+  if (/\b(como funciona|como se |que pasa cuando|por que |como calcul|como aprob|como rechaz|como cobr|como envi|como reserv)\b/.test(normalized)) {
+    return { intent: "PROJECT_FACT", confidence: "high", factScope: "SPECIFIC" };
+  }
+  if (/\b(avance|estado|hito|proximo paso|riesgo|bloqueo|esta semana)\b/.test(normalized)) {
+    return { intent: "PROJECT_STATUS", confidence: "high", factScope: null };
+  }
+  return null;
+}
+
 function formatDate(value: Date | null) {
   if (!value) return "sin fecha";
   return new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "short", year: "numeric" }).format(value);
@@ -131,15 +145,25 @@ function isSafeClientText(value: string, max = 900) {
   return value.length >= 3 && value.length <= max && !/(-----BEGIN|\b(?:sk|rk|pk)_[\w-]{12,}|postgres(?:ql)?:\/\/|\b(?:src|app|lib|prisma)\/|\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b)/i.test(value);
 }
 
-async function callOpenAIResponse(messages: OpenAIMessage[]) {
+async function callOpenAIResponse(messages: OpenAIMessage[], timeoutMs = 20_000) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY_MISSING");
-
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model: process.env.OPENAI_MODEL || "gpt-5", input: messages }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let response: Response;
+  try {
+    response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: process.env.OPENAI_MODEL || "gpt-5", input: messages }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error("OPENAI_RESPONSE_TIMEOUT");
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
   const data = (await response.json().catch(() => null)) as { output?: Array<{ content?: Array<{ type?: string; text?: string }> }>; error?: { message?: string } } | null;
   if (!response.ok) throw new Error(data?.error?.message || "OPENAI_RESPONSE_ERROR");
 
@@ -156,6 +180,8 @@ async function callOpenAIResponse(messages: OpenAIMessage[]) {
 async function classifyIntent(message: string, hasImage: boolean, generateVisual: boolean, history: Array<{ role: "user" | "assistant"; content: string }>): Promise<IntentDecision> {
   if (generateVisual || hasImage) return { intent: "VISUAL", confidence: "high", factScope: null };
   if (isSimpleGreeting(message)) return { intent: "SOCIAL", confidence: "high", factScope: null };
+  const obvious = classifyObviousIntent(message);
+  if (obvious) return obvious;
 
   try {
     const response = await callOpenAIResponse([
@@ -175,7 +201,7 @@ async function classifyIntent(message: string, hasImage: boolean, generateVisual
       },
       ...history.slice(-4),
       { role: "user", content: message },
-    ]);
+    ], 8_000);
     const parsed = extractJsonObject(response) as Partial<IntentDecision> | null;
     if (parsed && typeof parsed.intent === "string" && INTENTS.has(parsed.intent as AssistantIntent)) {
       return {
@@ -209,9 +235,8 @@ function parseTechnicalFindings(response: string, evidenceCount: number): Techni
   }).slice(0, 4);
 }
 
-async function researchTechnicalFacts(question: string, repoLocalPath: string | null, capabilityMap = false, searchHints: string[] = []): Promise<TechnicalResearch> {
-  const researchQuestion = [question, ...searchHints].join(" ");
-  const repoResearch = capabilityMap ? await researchProjectCapabilities({ repoLocalPath }) : await researchProjectRepo({ repoLocalPath, question: researchQuestion });
+async function researchTechnicalFacts(question: string, repoLocalPath: string | null, capabilityMap = false): Promise<TechnicalResearch> {
+  const repoResearch = capabilityMap ? await researchProjectCapabilities({ repoLocalPath }) : await researchProjectRepo({ repoLocalPath, question });
   if (!repoResearch.repoAvailable) return { attempted: true, usedEvidence: false, evidenceCount: 0, findings: [], reason: repoResearch.reason, capabilityMap };
   if (!repoResearch.evidence.length) return { attempted: true, usedEvidence: false, evidenceCount: 0, findings: [], reason: "No encontré evidencia suficiente en la implementación actual.", capabilityMap };
 
@@ -260,6 +285,28 @@ async function researchProjectBrainFacts(projectId: string, question: string, ca
   const capabilities = brain.domains.flatMap((domain) => domain.capabilities.map((capability) => ({ domain, capability }))).slice(0, 48);
   if (!capabilities.length) return null;
 
+  if (capabilityMap) {
+    const domains = brain.domains.filter((domain) => domain.capabilities.length > 0).slice(0, 5);
+    const findings = domains.flatMap((domain, index) => {
+      const claim = `${domain.name}: ${domain.description}`.trim();
+      if (!isSafeClientText(claim, 700)) return [];
+      return [{
+        claim,
+        confidence: domain.confidence === "partial" ? "partial" as const : "confirmed" as const,
+        limitation: domain.confidence === "partial" ? "Esta área está confirmada de forma parcial en la versión analizada." : undefined,
+        evidence: [index + 1],
+      }];
+    });
+    return {
+      attempted: true,
+      usedEvidence: findings.length > 0,
+      evidenceCount: capabilities.length,
+      findings,
+      reason: findings.length ? null : "El mapa funcional vigente no alcanza para resumir el producto.",
+      capabilityMap: true,
+    };
+  }
+
   try {
     const response = await callOpenAIResponse([
       {
@@ -293,47 +340,6 @@ async function researchProjectBrainFacts(projectId: string, question: string, ca
   } catch (error) {
     console.error("assistant project brain research failed", error);
     return { attempted: true, usedEvidence: false, evidenceCount: capabilities.length, findings: [], reason: "No pude consultar el mapa funcional en este momento.", capabilityMap };
-  }
-}
-
-function parseSearchHints(response: string) {
-  const parsed = extractJsonObject(response) as { terms?: unknown } | null;
-  if (!Array.isArray(parsed?.terms)) return [];
-  return Array.from(new Set(parsed.terms
-    .filter((term): term is string => typeof term === "string")
-    .map((term) => normalizeText(term).replace(/ /g, "_"))
-    .filter((term) => term.length >= 3 && term.length <= 40 && /^[a-z0-9_/-]+$/.test(term))))
-    .slice(0, 10);
-}
-
-/** The brain is an index, never the authority for a concrete flow. */
-async function planRepositoryInvestigation(projectId: string, question: string) {
-  const brain = await getReadyProjectBrain(projectId);
-  if (!brain) return [];
-  const map = brain.domains
-    .flatMap((domain) => domain.capabilities.map((capability) => `${domain.name}: ${capability.name} — ${capability.description}`))
-    .slice(0, 36);
-  if (!map.length) return [];
-
-  try {
-    const response = await callOpenAIResponse([
-      {
-        role: "system",
-        content: [
-          "Sos un planificador interno de investigación de repositorios. No respondas la pregunta del cliente.",
-          "Elegí entre 3 y 10 términos cortos que ayuden a encontrar la implementación de la pregunta en código. Podés usar español o inglés técnico cuando sea necesario.",
-          "Respondé sólo JSON válido: {\"terms\":[\"reservation\",\"approve\"]}.",
-          "Usá el mapa sólo como vocabulario. No inventes nombres de archivos, APIs, proveedores ni comportamientos.",
-          `Pregunta: ${question}`,
-          "Mapa funcional:",
-          ...map,
-        ].join("\n\n"),
-      },
-    ]);
-    return parseSearchHints(response);
-  } catch (error) {
-    console.error("assistant repository investigation planning failed", error);
-    return [];
   }
 }
 
@@ -515,8 +521,7 @@ export async function createAssistantReply(projectId: string, assistantSessionId
       research = { attempted: true, usedEvidence: repo.repoAvailable, evidenceCount: 0, findings: [], reason: repo.reason, capabilityMap: false };
     } else {
       if (decision.factScope === "SPECIFIC") {
-        const searchHints = await planRepositoryInvestigation(projectId, message);
-        research = await researchTechnicalFacts(message, project.repoLocalPath, false, searchHints);
+        research = await researchTechnicalFacts(message, project.repoLocalPath);
       } else {
         const brainResearch = await researchProjectBrainFacts(projectId, message, true);
         research = brainResearch?.usedEvidence
