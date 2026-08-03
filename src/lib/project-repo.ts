@@ -16,6 +16,9 @@ const MAX_CANDIDATE_FILES = 250;
 const MAX_EVIDENCE_FILES = 8;
 const MAX_EVIDENCE_CHARS = 1_400;
 const MAX_SENDA_KNOWLEDGE_FILES = 32;
+const MAX_CAPABILITY_CANDIDATE_FILES = 700;
+const MAX_CAPABILITY_EVIDENCE_FILES = 18;
+const MAX_CAPABILITY_EVIDENCE_CHARS = 1_800;
 
 export type RepoResearchEvidence = {
   /** Internal-only. Never send this object to the browser. */
@@ -140,7 +143,7 @@ async function collectSendaKnowledgeFiles(repoPath: string) {
   return collected;
 }
 
-async function collectCandidateFiles(repoPath: string, preferredFiles: string[] = []) {
+async function collectCandidateFiles(repoPath: string, preferredFiles: string[] = [], maxFiles = MAX_CANDIDATE_FILES) {
   const collected: string[] = [];
   for (const filePath of preferredFiles) {
     const relativePath = path.relative(/* turbopackIgnore: true */ repoPath, filePath);
@@ -150,7 +153,7 @@ async function collectCandidateFiles(repoPath: string, preferredFiles: string[] 
     }
   }
   const queue = [repoPath];
-  while (queue.length && collected.length < MAX_CANDIDATE_FILES) {
+  while (queue.length && collected.length < maxFiles) {
     const current = queue.shift();
     if (!current) break;
     const entries = await fs.readdir(/* turbopackIgnore: true */ current, { withFileTypes: true }).catch(() => []);
@@ -164,10 +167,51 @@ async function collectCandidateFiles(repoPath: string, preferredFiles: string[] 
       if (entry.isFile() && TEXT_EXTENSIONS.has(path.extname(entry.name).toLowerCase()) && isAllowedFile(relativePath) && !collected.includes(fullPath)) {
         collected.push(fullPath);
       }
-      if (collected.length >= MAX_CANDIDATE_FILES) break;
+      if (collected.length >= maxFiles) break;
     }
   }
   return collected;
+}
+
+function isCapabilityInstructionFile(relativePath: string) {
+  const normalized = relativePath.replace(/\\/g, "/").toLowerCase();
+  return /(^|\/)(agents?\.md|claude\.md|copilot-instructions\.md|instructions?\.|prompts?\/|styles?\/|assets?\/|storybook\/)/.test(normalized);
+}
+
+function capabilityPriority(relativePath: string) {
+  const normalized = relativePath.replace(/\\/g, "/").toLowerCase();
+  if (isCapabilityInstructionFile(normalized)) return -1000;
+  let score = 0;
+  if (/^\.senda\/(project|glossary|evaluations)\.(ya?ml|md)$/.test(normalized)) score += 180;
+  if (/^\.senda\/(domains|decisions)\//.test(normalized)) score += 150;
+  if (/(^|\/)(readme|package)\.(md|json)$/.test(normalized)) score += 125;
+  if (/(^|\/)(schema\.prisma|models?\/|entities?\/)/.test(normalized)) score += 110;
+  if (/(^|\/)(api\/|routes?\/|controllers?\/|services?\/|usecases?\/|providers?\/)/.test(normalized)) score += 100;
+  if (/(^|\/)(app\/|pages?\/|screens?\/|features?\/|components?\/)/.test(normalized)) score += 70;
+  if (/(^|\/)(tests?|__tests__|specs?)\//.test(normalized) || /\.(test|spec)\.[^.]+$/.test(normalized)) score += 65;
+  if (/\.(tsx?|jsx?)$/.test(normalized)) score += 15;
+  return score;
+}
+
+function buildCapabilityExcerpt(content: string) {
+  const lines = content.split(/\r?\n/);
+  const functionalLine = lines.findIndex((line) => /\b(router|route|controller|service|model|schema|create|update|delete|booking|reservation|payment|trip|shipment|delivery|search|checkout|publish)\b/i.test(line));
+  const start = functionalLine >= 0 ? Math.max(0, functionalLine - 6) : 0;
+  return lines.slice(start, Math.min(lines.length, start + 42)).join("\n");
+}
+
+async function resolveAuthorizedRepo(repoLocalPath: string | null) {
+  if (!process.env.PROJECT_REPOS_ROOT?.trim()) return { repoPath: null, reason: "La investigacion del repositorio no esta habilitada." };
+  let repoPath: string | null;
+  try { repoPath = resolveProjectRepoPath(repoLocalPath); } catch { return { repoPath: null, reason: "La ruta configurada del repositorio no es valida." }; }
+  if (!repoPath || !(await fs.stat(/* turbopackIgnore: true */ repoPath).catch(() => null))?.isDirectory()) return { repoPath: null, reason: "Este proyecto no tiene un repositorio local disponible." };
+  const configuredRoot = process.env.PROJECT_REPOS_ROOT!.trim();
+  const [canonicalRoot, canonicalRepoPath] = await Promise.all([
+    fs.realpath(/* turbopackIgnore: true */ configuredRoot).catch(() => null),
+    fs.realpath(/* turbopackIgnore: true */ repoPath).catch(() => null),
+  ]);
+  if (!canonicalRoot || !canonicalRepoPath || !isWithinParent(canonicalRoot, canonicalRepoPath)) return { repoPath: null, reason: "La ruta del repositorio no esta autorizada." };
+  return { repoPath: canonicalRepoPath, reason: null };
 }
 
 function getRelativeImports(content: string) {
@@ -191,26 +235,9 @@ function expandRelativeImports(seedPaths: string[], contents: Map<string, string
 }
 
 export async function researchProjectRepo(params: { repoLocalPath: string | null; question: string }): Promise<RepoResearchResult> {
-  if (!process.env.PROJECT_REPOS_ROOT?.trim()) {
-    return { repoAvailable: false, reason: "La investigacion del repositorio no esta habilitada.", filesScanned: 0, evidence: [] };
-  }
-
-  let repoPath: string | null;
-  try { repoPath = resolveProjectRepoPath(params.repoLocalPath); } catch {
-    return { repoAvailable: false, reason: "La ruta configurada del repositorio no es valida.", filesScanned: 0, evidence: [] };
-  }
-  if (!repoPath || !(await fs.stat(/* turbopackIgnore: true */ repoPath).catch(() => null))?.isDirectory()) {
-    return { repoAvailable: false, reason: "Este proyecto no tiene un repositorio local disponible.", filesScanned: 0, evidence: [] };
-  }
-  const configuredRoot = process.env.PROJECT_REPOS_ROOT!.trim();
-  const [canonicalRoot, canonicalRepoPath] = await Promise.all([
-    fs.realpath(/* turbopackIgnore: true */ configuredRoot).catch(() => null),
-    fs.realpath(/* turbopackIgnore: true */ repoPath).catch(() => null),
-  ]);
-  if (!canonicalRoot || !canonicalRepoPath || !isWithinParent(canonicalRoot, canonicalRepoPath)) {
-    return { repoAvailable: false, reason: "La ruta del repositorio no esta autorizada.", filesScanned: 0, evidence: [] };
-  }
-  repoPath = canonicalRepoPath;
+  const resolved = await resolveAuthorizedRepo(params.repoLocalPath);
+  if (!resolved.repoPath) return { repoAvailable: false, reason: resolved.reason, filesScanned: 0, evidence: [] };
+  const repoPath = resolved.repoPath;
 
   const terms = normalizeQueryTerms(params.question);
   if (!terms.length) return { repoAvailable: true, reason: null, filesScanned: 0, evidence: [] };
@@ -244,4 +271,36 @@ export async function researchProjectRepo(params: { repoLocalPath: string | null
       score: topFiles.find((item) => item.filePath === filePath)?.score ?? 0,
     })),
   };
+}
+
+/**
+ * Safe, read-only architecture exploration for product-capability questions.
+ * It deliberately prioritizes executable boundaries and approved project docs,
+ * and excludes agent instructions, prompts and purely visual assets.
+ */
+export async function researchProjectCapabilities(params: { repoLocalPath: string | null }): Promise<RepoResearchResult> {
+  const resolved = await resolveAuthorizedRepo(params.repoLocalPath);
+  if (!resolved.repoPath) return { repoAvailable: false, reason: resolved.reason, filesScanned: 0, evidence: [] };
+  const repoPath = resolved.repoPath;
+  const knowledgeFiles = await collectSendaKnowledgeFiles(repoPath);
+  const files = await collectCandidateFiles(repoPath, knowledgeFiles, MAX_CAPABILITY_CANDIDATE_FILES);
+  const candidates = files
+    .map((filePath) => ({ filePath, relativePath: path.relative(/* turbopackIgnore: true */ repoPath, filePath), score: capabilityPriority(path.relative(/* turbopackIgnore: true */ repoPath, filePath)) }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.relativePath.localeCompare(b.relativePath))
+    .slice(0, MAX_CAPABILITY_EVIDENCE_FILES);
+
+  const evidence = await Promise.all(candidates.map(async (candidate) => {
+    const stat = await fs.stat(/* turbopackIgnore: true */ candidate.filePath).catch(() => null);
+    if (!stat?.isFile() || stat.size > MAX_FILE_SIZE_BYTES) return null;
+    const content = await fs.readFile(/* turbopackIgnore: true */ candidate.filePath, "utf8").catch(() => null);
+    if (content === null) return null;
+    return {
+      path: candidate.relativePath,
+      content: redactSensitiveValues(buildCapabilityExcerpt(content)).slice(0, MAX_CAPABILITY_EVIDENCE_CHARS),
+      score: candidate.score,
+    } satisfies RepoResearchEvidence;
+  }));
+
+  return { repoAvailable: true, reason: null, filesScanned: files.length, evidence: evidence.filter((item): item is RepoResearchEvidence => item !== null) };
 }
