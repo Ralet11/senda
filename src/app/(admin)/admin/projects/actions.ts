@@ -322,23 +322,9 @@ export async function reindexProjectContextAction(projectId: string) {
 export async function prepareProjectBrainSyncAction(projectId: string) {
   await requireAdmin();
 
+  let result: Awaited<ReturnType<typeof prepareProjectBrainSync>>;
   try {
-    const result = await prepareProjectBrainSync(projectId);
-    revalidatePath(`/admin/projects/${projectId}`);
-
-    if (!result.queued) {
-      redirectWithStatus(
-        `/admin/projects/${projectId}`,
-        "error",
-        "La fuente tiene cambios sin confirmar. Confirmalos o usá un mirror antes de generar un cerebro reproducible.",
-      );
-    }
-
-    redirectWithStatus(
-      `/admin/projects/${projectId}`,
-      "success",
-      `Fuente validada en ${result.inspection.commitHash?.slice(0, 8)}. El cerebro quedó preparado para su construcción.`,
-    );
+    result = await prepareProjectBrainSync(projectId);
   } catch (error) {
     console.error("project brain onboarding failed", error);
     redirectWithStatus(
@@ -347,6 +333,21 @@ export async function prepareProjectBrainSyncAction(projectId: string) {
       "No se pudo validar la fuente del repositorio. Revisá la ruta autorizada y el estado Git.",
     );
   }
+
+  revalidatePath(`/admin/projects/${projectId}`);
+  if (!result.queued) {
+    redirectWithStatus(
+      `/admin/projects/${projectId}`,
+      "error",
+      "La fuente tiene cambios sin confirmar. Confirmalos o usá un mirror antes de generar un cerebro reproducible.",
+    );
+  }
+
+  redirectWithStatus(
+    `/admin/projects/${projectId}`,
+    "success",
+    `Fuente validada en ${result.inspection.commitHash?.slice(0, 8)}. El cerebro quedó preparado para su construcción.`,
+  );
 }
 
 export async function createProjectUpdateAction(projectId: string, formData: FormData) {
