@@ -9,6 +9,11 @@ export async function POST(request: Request) {
   const user = await requireProjectMember(projectId);
   const session = await prisma.assistantSession.findFirst({ where: { id: sessionId, projectId, userId: user.id } });
   if (!session) return NextResponse.json({ error: "No tenés acceso a esta sesión." }, { status: 403 });
+  const existing = await prisma.proposal.findFirst({
+    where: { projectId, assistantSessionId: sessionId, createdById: user.id, status: { in: ["DRAFT", "NEEDS_CLARIFICATION"] } },
+    orderBy: { updatedAt: "desc" },
+  });
+  if (existing) return NextResponse.json({ proposal: existing });
   const chunks = await prisma.projectContextChunk.findMany({ where: { projectId, assistantSessionId: sessionId, source: { in: ["assistant_user", "assistant_reply"] } }, orderBy: { createdAt: "asc" }, take: 16 });
   const clientText = chunks.filter((chunk) => chunk.source === "assistant_user").map((chunk) => chunk.content).join("\n").trim();
   if (!clientText) return NextResponse.json({ error: "Necesitás conversar un poco más antes de preparar una propuesta." }, { status: 400 });

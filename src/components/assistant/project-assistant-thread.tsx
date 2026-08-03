@@ -11,6 +11,7 @@ import {
   type FormEvent,
 } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type AssistantItem = {
   id: string;
@@ -126,7 +127,8 @@ export function ProjectAssistantThread({
     event.preventDefault();
 
     const trimmed = message.trim();
-    if (!trimmed) return;
+    if (!trimmed && selectedImages.length === 0) return;
+    const effectiveMessage = trimmed || "Analizá la imagen adjunta.";
 
     setIsSubmitting(true);
     setError(null);
@@ -143,7 +145,7 @@ export function ProjectAssistantThread({
     const optimisticUserMessage: AssistantItem = {
       id: `optimistic-user-${Date.now()}`,
       role: "user",
-      content: trimmed,
+      content: effectiveMessage,
       createdAt: new Date().toISOString(),
     };
     const optimisticAssistantMessage: AssistantItem = {
@@ -165,7 +167,7 @@ export function ProjectAssistantThread({
     const res = await fetch("/api/assistant", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectId, sessionId, message: trimmed, attachmentIds, generateVisual }),
+      body: JSON.stringify({ projectId, sessionId, message: effectiveMessage, attachmentIds, generateVisual }),
     });
 
     const data = (await res.json().catch(() => null)) as
@@ -365,9 +367,16 @@ export function ProjectAssistantThread({
                     {isSubmitting ? "Consultando..." : "Preguntar"}
                   </button>
                 </div>
-                <button type="submit" disabled={isSubmitting || !message.trim()} className="mb-0.5 inline-flex h-8 shrink-0 items-center justify-center rounded-lg bg-zinc-950 px-3 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? "..." : "Enviar"}</button>
+                <button type="submit" disabled={isSubmitting || (!message.trim() && selectedImages.length === 0)} className="mb-0.5 inline-flex h-8 shrink-0 items-center justify-center rounded-lg bg-zinc-950 px-3 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? "..." : "Enviar"}</button>
               </div>
-              {proposal ? <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">Propuesta creada: {proposal.title}</p> : null}
+              {proposal ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900">
+                  <p>Propuesta en preparación: <strong>{proposal.title}</strong></p>
+                  <Link href={`/projects/${projectId}/proposals/${proposal.id}`} className="rounded-md bg-teal-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-teal-800">
+                    Ver propuesta
+                  </Link>
+                </div>
+              ) : null}
               {error ? <p className="text-sm text-red-600">{error}</p> : null}
             </form>
           </div>
