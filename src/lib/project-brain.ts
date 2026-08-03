@@ -214,3 +214,27 @@ export async function buildProjectBrain(projectId: string) {
     throw error;
   }
 }
+
+/** Client-safe projection of the latest reviewed project brain. Evidence stays internal. */
+export async function getReadyProjectBrain(projectId: string) {
+  return prisma.projectBrainVersion.findFirst({
+    where: { projectId, status: "READY" },
+    orderBy: [{ generatedAt: "desc" }, { createdAt: "desc" }],
+    select: {
+      id: true,
+      domains: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          key: true,
+          name: true,
+          description: true,
+          confidence: true,
+          capabilities: {
+            orderBy: { createdAt: "asc" },
+            select: { key: true, name: true, description: true, confidence: true },
+          },
+        },
+      },
+    },
+  });
+}
