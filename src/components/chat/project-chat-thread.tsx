@@ -10,6 +10,7 @@ import {
   type DragEvent,
   type FormEvent,
 } from "react";
+import { AssistantMarkdown } from "@/components/ui/assistant-markdown";
 
 type ChatMessage = {
   id: string;
@@ -313,7 +314,13 @@ export function ProjectChatThread({
                             {formatTimestamp(message.createdAt)}
                           </span>
                         </div>
-                        {message.body ? <p className="mt-1 whitespace-pre-wrap text-[13px] leading-5">{message.body}</p> : null}
+                        {message.body ? (
+                          message.isFromAssistant ? (
+                            <AssistantMarkdown content={message.body} />
+                          ) : (
+                            <p className="mt-1 whitespace-pre-wrap text-[13px] leading-5">{message.body}</p>
+                          )
+                        ) : null}
                         {message.attachments.length > 0 ? (
                           <div className="mt-3 flex flex-wrap gap-2">
                             {message.attachments.map((attachment) => (

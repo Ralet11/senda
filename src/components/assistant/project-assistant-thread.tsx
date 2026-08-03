@@ -12,6 +12,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { AssistantMarkdown } from "@/components/ui/assistant-markdown";
 
 type AssistantItem = {
   id: string;
@@ -285,9 +286,11 @@ export function ProjectAssistantThread({
                             {formatTimestamp(item.createdAt)}
                           </span>
                         </div>
-                        <p className="mt-1 whitespace-pre-wrap text-[13px] leading-5">
-                          {item.content}
-                        </p>
+                        {own ? (
+                          <p className="mt-1 whitespace-pre-wrap text-[13px] leading-5">{item.content}</p>
+                        ) : (
+                          <AssistantMarkdown content={item.content} />
+                        )}
                         {item.attachments?.length ? (
                           <div className="mt-3 flex flex-wrap gap-2">
                             {item.attachments.map((attachment) => (
