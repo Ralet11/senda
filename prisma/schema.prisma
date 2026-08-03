@@ -135,6 +135,7 @@ model Project {
   repoProvider      String?
   repoLocalPath     String?
   repoDefaultBranch String?
+  repoUrl           String? // git remote (SSH) que scripts/sync-repo-clones.ts clona/actualiza; repoLocalPath queda auto-gestionado cuando este campo esta seteado
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 

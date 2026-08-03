@@ -31,7 +31,16 @@ El flujo tiene dos etapas:
 
 La lectura esta limitada a 250 archivos candidatos, 8 piezas de evidencia y archivos de hasta 256 KB. Excluye directorios generados, dependencias, Git, archivos `.env`, claves, certificados, credenciales y respaldos. Las respuestas tecnicas deben indicar limites cuando no haya evidencia suficiente; el assistant no debe prometer una verificacion que no realizo.
 
-Para habilitarlo en un entorno, `PROJECT_REPOS_ROOT` debe apuntar al directorio padre controlado que contiene los repositorios. `Project.repoLocalPath` siempre se resuelve dentro de ese directorio; una ruta que intente salir de el se rechaza.
+Para habilitarlo en un entorno, `PROJECT_REPOS_ROOT` debe apuntar a un directorio que Senda controla en exclusiva — nunca al checkout en vivo de otra aplicacion ni a un directorio padre que contenga otras apps. `Project.repoLocalPath` siempre se resuelve dentro de ese directorio; una ruta que resuelva a la raiz misma o intente salir de ella se rechaza.
+
+## Clones propios (`repoUrl` + `scripts/sync-repo-clones.ts`)
+
+Senda nunca lee el checkout con el que corre la aplicacion del cliente: mantiene su propio clone de solo lectura, separado de donde esa app efectivamente corre. Esto desacopla la investigacion del assistant de la infraestructura del cliente (incluida una futura migracion a un EC2 dedicado) y es la unica fuente que `PROJECT_REPOS_ROOT` debe contener.
+
+1. Cargar `Project.repoUrl` con el remoto SSH del repo (ej. `git@github.com:org/repo.git`). Mientras este seteado, `Project.repoLocalPath` queda autogestionado por el script (siempre `Project.id`).
+2. Generar una deploy key de solo lectura por proyecto en GitHub y guardar la clave privada en `SENDA_REPO_KEYS_DIR/<projectId>` (permisos `600`). Ese directorio debe vivir fuera de `PROJECT_REPOS_ROOT`: la investigacion del assistant nunca debe poder alcanzar una clave privada.
+3. Correr `npm run repos:sync` (clona si no existe, si no `fetch` + `reset --hard` al branch configurado). Registra el resultado en `ProjectRepository` (`kind: GIT_MIRROR`, `lastSeenCommit`, `lastSeenAt`, `lastError`).
+4. Programarlo semanalmente (cron/systemd timer en el EC2) invocando `npm run repos:sync` desde el checkout de Senda con `.env.production` cargado.
 
 ## Alcance inicial
 
