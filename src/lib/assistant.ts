@@ -116,7 +116,10 @@ function detectActionableRequest(message: string) {
 }
 
 function isImplementationQuestion(message: string) {
-  const normalized = message.toLowerCase();
+  const normalized = message
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
   const patterns = [
     "repo",
     "codigo",
@@ -219,6 +222,34 @@ function isRepositoryAccessQuestion(message: string) {
   ];
 
   return patterns.some((pattern) => normalized.includes(pattern));
+}
+
+function isSocialOnlyMessage(message: string) {
+  const normalized = message
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return new Set([
+    "hola",
+    "buenas",
+    "buen dia",
+    "buenas tardes",
+    "buenas noches",
+    "gracias",
+    "muchas gracias",
+    "ok",
+    "okay",
+    "dale",
+    "perfecto",
+  ]).has(normalized);
+}
+
+function shouldResearchProject(message: string, generateVisual: boolean | undefined) {
+  return Boolean(message.trim()) && !generateVisual && !isSocialOnlyMessage(message);
 }
 
 function buildProposalTitle(message: string) {
@@ -352,7 +383,12 @@ function buildVerifiedTechnicalReply(research: TechnicalResearch) {
   return [
     "Según la implementación actual:",
     "",
-    ...findings.map((finding) => `- ${finding}`),
+    ...findings.flatMap((finding) => {
+      const [claim, limitation] = finding.split(" Aclaracion: ");
+      return limitation
+        ? [`- ${claim}`, `  - Alcance: ${limitation}`]
+        : [`- ${claim}`];
+    }),
   ].join("\n");
 }
 
@@ -603,10 +639,7 @@ export async function createAssistantReply(
   const imageInputParts = await buildImageInputParts(input.attachments);
   const title = message.trim().replace(/\s+/g, " ").slice(0, 72) || "Nueva conversación";
 
-  const shouldResearch = shouldResearchImplementation({
-    message,
-    projectName: project.name,
-  }) || isRepositoryAccessQuestion(message);
+  const shouldResearch = shouldResearchProject(message, input.generateVisual);
   const repoResearch = shouldResearch
     ? await researchProjectRepo({
         repoLocalPath: project.repoLocalPath,
