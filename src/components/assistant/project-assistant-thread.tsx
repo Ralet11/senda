@@ -308,7 +308,7 @@ export function ProjectAssistantThread({
                         {!own && item.research?.used ? (
                           <div className="mt-3 border-t border-sky-200 pt-2">
                             <p className="text-[11px] text-sky-800/80">
-                              Respuesta contrastada con la implementaciÃ³n actual.
+                              Respuesta contrastada con la implementación actual.
                             </p>
                           </div>
                         ) : null}
