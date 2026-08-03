@@ -9,6 +9,7 @@ import {
   createProjectUpdateAction,
   discardProjectUpdateAction,
   publishProjectUpdateAction,
+  prepareProjectBrainSyncAction,
   reindexProjectContextAction,
   toggleMilestoneAction,
   updateProjectAction,
@@ -68,6 +69,18 @@ export default async function AdminProjectDetailPage({
       updates: {
         orderBy: [{ status: "asc" }, { createdAt: "desc" }],
       },
+      repository: {
+        include: {
+          brainVersions: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+        },
+      },
+      brainEvaluations: {
+        where: { isActive: true },
+        select: { id: true },
+      },
     },
   });
 
@@ -79,6 +92,7 @@ export default async function AdminProjectDetailPage({
   const addMilestone = addMilestoneAction.bind(null, projectId);
   const addActivity = addActivityLogAction.bind(null, projectId);
   const reindexContext = reindexProjectContextAction.bind(null, projectId);
+  const prepareBrain = prepareProjectBrainSyncAction.bind(null, projectId);
   const createUpdate = createProjectUpdateAction.bind(null, projectId);
   const draftUpdates = project.updates.filter((update) => update.status === "DRAFT");
   const publishedUpdates = project.updates.filter(
@@ -623,6 +637,31 @@ export default async function AdminProjectDetailPage({
                   <span className="font-medium">Ruta:</span>{" "}
                   {project.repoLocalPath || "No configurada"}
                 </p>
+              </div>
+
+              <div className="mt-4 border-t border-zinc-200 pt-4">
+                <h3 className="text-sm font-semibold text-zinc-900">Cerebro del proyecto</h3>
+                <p className="mt-1 text-sm text-zinc-600">
+                  Registra un commit reproducible antes de construir el mapa funcional. La fuente se lee sólo en modo lectura.
+                </p>
+                <div className="mt-3 space-y-1 rounded-md border border-zinc-200 px-4 py-3 text-sm text-zinc-700">
+                  <p>Estado: <span className="font-medium">{project.repository?.brainStatus ?? "NOT_SYNCED"}</span></p>
+                  <p>Último commit: <span className="font-mono">{project.repository?.lastSeenCommit?.slice(0, 12) ?? "Sin validar"}</span></p>
+                  <p>Evaluaciones activas: <span className="font-medium">{project.brainEvaluations.length}</span></p>
+                  {project.repository?.lastError ? <p className="text-amber-700">{project.repository.lastError}</p> : null}
+                </div>
+                <form action={prepareBrain} className="mt-3">
+                  <SubmitButton
+                    idleLabel="Preparar onboarding"
+                    pendingLabel="Validando fuente..."
+                    className="inline-flex h-9 items-center justify-center rounded-md bg-zinc-950 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </form>
+                {project.repository?.brainVersions[0] ? (
+                  <p className="mt-2 text-xs text-zinc-500">
+                    Última versión: {project.repository.brainVersions[0].status} · {project.repository.brainVersions[0].commitHash.slice(0, 12)}
+                  </p>
+                ) : null}
               </div>
 
               <div className="mt-4 border-t border-zinc-200 pt-4">

@@ -1,6 +1,10 @@
 import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 const TEXT_EXTENSIONS = new Set([
   ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".json", ".md", ".mdx",
@@ -32,6 +36,15 @@ export type RepoResearchResult = {
   reason: string | null;
   filesScanned: number;
   evidence: RepoResearchEvidence[];
+};
+
+export type RepositoryInspection = {
+  repoAvailable: boolean;
+  reason: string | null;
+  relativePath: string | null;
+  commitHash: string | null;
+  defaultBranch: string | null;
+  worktreeDirty: boolean;
 };
 
 const RELATED_TERMS: Record<string, string[]> = {
@@ -212,6 +225,44 @@ async function resolveAuthorizedRepo(repoLocalPath: string | null) {
   ]);
   if (!canonicalRoot || !canonicalRepoPath || !isWithinParent(canonicalRoot, canonicalRepoPath)) return { repoPath: null, reason: "La ruta del repositorio no esta autorizada." };
   return { repoPath: canonicalRepoPath, reason: null };
+}
+
+/**
+ * Reads repository metadata without changing the checkout. This is the only
+ * entrypoint used during onboarding; callers never receive an absolute path.
+ */
+export async function inspectAuthorizedRepository(repoLocalPath: string | null): Promise<RepositoryInspection> {
+  const resolved = await resolveAuthorizedRepo(repoLocalPath);
+  if (!resolved.repoPath) {
+    return { repoAvailable: false, reason: resolved.reason, relativePath: null, commitHash: null, defaultBranch: null, worktreeDirty: false };
+  }
+
+  const configuredRoot = process.env.PROJECT_REPOS_ROOT!.trim();
+  const relativePath = path.relative(/* turbopackIgnore: true */ configuredRoot, resolved.repoPath).replace(/\\/g, "/");
+  try {
+    const [{ stdout: commit }, { stdout: branch }, { stdout: worktree }] = await Promise.all([
+      execFileAsync("git", ["-C", resolved.repoPath, "rev-parse", "HEAD"], { timeout: 8_000, windowsHide: true }),
+      execFileAsync("git", ["-C", resolved.repoPath, "branch", "--show-current"], { timeout: 8_000, windowsHide: true }),
+      execFileAsync("git", ["-C", resolved.repoPath, "status", "--porcelain"], { timeout: 8_000, windowsHide: true }),
+    ]);
+    return {
+      repoAvailable: true,
+      reason: null,
+      relativePath,
+      commitHash: commit.trim() || null,
+      defaultBranch: branch.trim() || null,
+      worktreeDirty: Boolean(worktree.trim()),
+    };
+  } catch {
+    return {
+      repoAvailable: false,
+      reason: "La fuente autorizada no es un repositorio Git legible.",
+      relativePath: null,
+      commitHash: null,
+      defaultBranch: null,
+      worktreeDirty: false,
+    };
+  }
 }
 
 function getRelativeImports(content: string) {

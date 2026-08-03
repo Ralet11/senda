@@ -10,6 +10,7 @@ import type {
 import { requireAdmin } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
+import { prepareProjectBrainSync } from "@/lib/project-brain";
 import { reindexProjectContext } from "@/lib/project-rag";
 import {
   createProjectUpdate,
@@ -314,6 +315,36 @@ export async function reindexProjectContextAction(projectId: string) {
       `/admin/projects/${projectId}`,
       "error",
       "No se pudo reindexar el contexto semántico. Revisá la configuración de OpenAI y volvé a intentar.",
+    );
+  }
+}
+
+export async function prepareProjectBrainSyncAction(projectId: string) {
+  await requireAdmin();
+
+  try {
+    const result = await prepareProjectBrainSync(projectId);
+    revalidatePath(`/admin/projects/${projectId}`);
+
+    if (!result.queued) {
+      redirectWithStatus(
+        `/admin/projects/${projectId}`,
+        "error",
+        "La fuente tiene cambios sin confirmar. Confirmalos o usá un mirror antes de generar un cerebro reproducible.",
+      );
+    }
+
+    redirectWithStatus(
+      `/admin/projects/${projectId}`,
+      "success",
+      `Fuente validada en ${result.inspection.commitHash?.slice(0, 8)}. El cerebro quedó preparado para su construcción.`,
+    );
+  } catch (error) {
+    console.error("project brain onboarding failed", error);
+    redirectWithStatus(
+      `/admin/projects/${projectId}`,
+      "error",
+      "No se pudo validar la fuente del repositorio. Revisá la ruta autorizada y el estado Git.",
     );
   }
 }
