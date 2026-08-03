@@ -81,6 +81,16 @@ const RELATED_TERMS: Record<string, string[]> = {
   precios: ["price", "fare", "rate", "quote", "amount"],
   integracion: ["integration", "webhook", "provider", "api"],
   integraciones: ["integration", "webhook", "provider", "api"],
+  aprobar: ["approve", "approved", "accept", "accepted", "confirmation", "reservation", "booking", "seat"],
+  aprobacion: ["approve", "approved", "accept", "accepted", "confirmation", "reservation", "booking", "seat"],
+  rechazar: ["reject", "rejected", "decline", "declined", "cancel", "reservation", "booking", "seat"],
+  rechazo: ["reject", "rejected", "decline", "declined", "cancel", "reservation", "booking", "seat"],
+  solicitud: ["request", "reservation", "booking", "seat", "passenger"],
+  solicitudes: ["request", "reservation", "booking", "seat", "passenger"],
+  asiento: ["seat", "reservation", "booking", "passenger", "capacity"],
+  asientos: ["seat", "reservation", "booking", "passenger", "capacity"],
+  reserva: ["reservation", "booking", "seat", "passenger", "trip"],
+  reservas: ["reservation", "booking", "seat", "passenger", "trip"],
 };
 
 function normalizeQueryTerms(query: string) {
