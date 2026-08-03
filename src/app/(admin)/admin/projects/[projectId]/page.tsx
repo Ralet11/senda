@@ -106,6 +106,18 @@ export default async function AdminProjectDetailPage({
   const publishedUpdates = project.updates.filter(
     (update) => update.status === "PUBLISHED",
   );
+  const latestBrainVersion = project.repository?.brainVersions[0] ?? null;
+  const sourceReady = Boolean(project.repository?.lastSeenCommit) && !project.repository?.worktreeDirty;
+  const snapshotReady = Boolean(latestBrainVersion);
+  const mapReady = latestBrainVersion?.status === "READY";
+  const evaluationReady = project.brainEvaluations.length > 0;
+  const onboardingSteps = [
+    { label: "Fuente", detail: sourceReady ? "Commit validado" : "Pendiente", complete: sourceReady },
+    { label: "Snapshot", detail: snapshotReady ? "Versión registrada" : "Pendiente", complete: snapshotReady },
+    { label: "Mapa", detail: mapReady ? "Generado" : latestBrainVersion?.status === "BUILDING" ? "Analizando" : "Pendiente", complete: mapReady },
+    { label: "Evaluación", detail: evaluationReady ? "Casos definidos" : "Pendiente", complete: evaluationReady },
+  ];
+  const completedOnboardingSteps = onboardingSteps.filter((step) => step.complete).length;
 
   return (
     <main className="min-h-screen bg-zinc-50">
@@ -652,6 +664,20 @@ export default async function AdminProjectDetailPage({
                 <p className="mt-1 text-sm text-zinc-600">
                   Registra un commit reproducible antes de construir el mapa funcional. La fuente se lee sólo en modo lectura.
                 </p>
+                <div className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-600">Avance del onboarding</p>
+                    <span className="text-xs font-medium text-zinc-700">{completedOnboardingSteps}/4 pasos</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {onboardingSteps.map((step, index) => (
+                      <div key={step.label} className={`rounded border px-2 py-2 ${step.complete ? "border-emerald-200 bg-emerald-50" : "border-zinc-200 bg-white"}`}>
+                        <p className={`text-xs font-semibold ${step.complete ? "text-emerald-800" : "text-zinc-700"}`}>{index + 1}. {step.label}</p>
+                        <p className={`mt-0.5 text-[11px] ${step.complete ? "text-emerald-700" : "text-zinc-500"}`}>{step.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
                 <div className="mt-3 space-y-1 rounded-md border border-zinc-200 px-4 py-3 text-sm text-zinc-700">
                   <p>Estado: <span className="font-medium">{project.repository?.brainStatus ?? "NOT_SYNCED"}</span></p>
                   <p>Último commit: <span className="font-mono">{project.repository?.lastSeenCommit?.slice(0, 12) ?? "Sin validar"}</span></p>
