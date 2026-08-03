@@ -4,6 +4,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { createHash } from "node:crypto";
+import { parse as parseYaml } from "yaml";
 
 const execFileAsync = promisify(execFile);
 
@@ -48,6 +49,20 @@ export type RepositoryInspection = {
   commitHash: string | null;
   defaultBranch: string | null;
   worktreeDirty: boolean;
+};
+
+/** A domain entry authored by the client repo in `.senda/project.yml`. Used to steer, not replace, evidence search. */
+export type SendaManifestDomain = {
+  key: string;
+  labels: string[];
+  codeAreas: string[];
+  documentation: string[];
+  tests: string[];
+};
+
+export type SendaManifest = {
+  domains: SendaManifestDomain[];
+  glossary: Array<{ term: string; clientTerm: string; description: string }>;
 };
 
 export type ProjectBrainSourceKind = "PROJECT_DOC" | "DOMAIN_DOC" | "SCHEMA" | "API" | "SERVICE" | "UI" | "TEST";
@@ -141,9 +156,15 @@ function isAllowedFile(relativePath: string) {
   return !SENSITIVE_FILE_NAMES.test(relativePath.replace(/\\/g, "/"));
 }
 
+/**
+ * True only when candidate is a strict descendant of parent. Equality is deliberately rejected: every
+ * caller uses this to confirm a project's repo path is scoped *inside* an authorized root, and PROJECT_REPOS_ROOT
+ * can hold multiple unrelated apps side by side — a project pointed at the root itself (e.g. repoLocalPath ".")
+ * would otherwise be "authorized" to read every one of them.
+ */
 function isWithinParent(parent: string, candidate: string) {
   const relative = path.relative(/* turbopackIgnore: true */ parent, candidate);
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+  return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
 }
 
 export function resolveProjectRepoPath(repoLocalPath: string | null) {
@@ -279,6 +300,116 @@ async function resolveAuthorizedRepo(repoLocalPath: string | null) {
   return { repoPath: canonicalRepoPath, reason: null };
 }
 
+const MAX_MANIFEST_FILE_BYTES = 64 * 1024;
+
+function sanitizeManifestString(value: unknown, maxLength: number) {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  if (!text || text.length > maxLength) return null;
+  return text;
+}
+
+/** Rejects anything that could escape the repo root; callers only ever get these joined against a trusted repoPath. */
+function sanitizeManifestRelativePath(value: unknown) {
+  const text = sanitizeManifestString(value, 200);
+  if (!text) return null;
+  const normalized = text.replace(/\\/g, "/").replace(/^\.\//, "");
+  if (!normalized || normalized.startsWith("/") || normalized.split("/").includes("..")) return null;
+  return normalized;
+}
+
+async function readManifestYaml(repoPath: string, relativePath: string): Promise<unknown | null> {
+  const filePath = path.join(/* turbopackIgnore: true */ repoPath, relativePath);
+  const stat = await fs.stat(/* turbopackIgnore: true */ filePath).catch(() => null);
+  if (!stat?.isFile() || stat.size > MAX_MANIFEST_FILE_BYTES) return null;
+  const content = await fs.readFile(/* turbopackIgnore: true */ filePath, "utf8").catch(() => null);
+  if (content === null) return null;
+  try {
+    return parseYaml(content);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reads the client-authored `.senda/project.yml` (domain -> code/doc/test routing) and
+ * `.senda/glossary.yml` (internal term -> client term) as structured data, not free text.
+ * Returns null whenever the manifest is missing or malformed so callers can fall back safely.
+ */
+export async function loadSendaManifest(repoLocalPath: string | null): Promise<SendaManifest | null> {
+  const resolved = await resolveAuthorizedRepo(repoLocalPath);
+  if (!resolved.repoPath) return null;
+  const repoPath = resolved.repoPath;
+
+  const [projectRaw, glossaryRaw] = await Promise.all([
+    readManifestYaml(repoPath, ".senda/project.yml"),
+    readManifestYaml(repoPath, ".senda/glossary.yml"),
+  ]);
+
+  const domains: SendaManifestDomain[] = [];
+  const domainsRaw = projectRaw && typeof projectRaw === "object" ? (projectRaw as Record<string, unknown>).domains : null;
+  if (domainsRaw && typeof domainsRaw === "object") {
+    for (const [key, value] of Object.entries(domainsRaw as Record<string, unknown>)) {
+      const safeKey = sanitizeManifestString(key, 64);
+      if (!safeKey || !value || typeof value !== "object") continue;
+      const entry = value as Record<string, unknown>;
+      const toStringList = (raw: unknown, max: number) => (Array.isArray(raw) ? raw.map((item) => sanitizeManifestString(item, 80)).filter((item): item is string => item !== null).slice(0, max) : []);
+      const toPathList = (raw: unknown, max: number) => (Array.isArray(raw) ? raw.map((item) => sanitizeManifestRelativePath(item)).filter((item): item is string => item !== null).slice(0, max) : []);
+      domains.push({
+        key: safeKey,
+        labels: toStringList(entry.labels, 20),
+        codeAreas: toPathList(entry.code_areas, 20),
+        documentation: toPathList(entry.documentation, 10),
+        tests: toPathList(entry.tests, 10),
+      });
+      if (domains.length >= 40) break;
+    }
+  }
+
+  const glossary: Array<{ term: string; clientTerm: string; description: string }> = [];
+  const termsRaw = glossaryRaw && typeof glossaryRaw === "object" ? (glossaryRaw as Record<string, unknown>).terms : null;
+  if (termsRaw && typeof termsRaw === "object") {
+    for (const [term, value] of Object.entries(termsRaw as Record<string, unknown>)) {
+      const safeTerm = sanitizeManifestString(term, 64);
+      if (!safeTerm || !value || typeof value !== "object") continue;
+      const entry = value as Record<string, unknown>;
+      const clientTerm = sanitizeManifestString(entry.client_term, 80);
+      if (!clientTerm) continue;
+      glossary.push({ term: safeTerm, clientTerm, description: sanitizeManifestString(entry.description, 300) ?? "" });
+      if (glossary.length >= 80) break;
+    }
+  }
+
+  if (!domains.length && !glossary.length) return null;
+  return { domains, glossary };
+}
+
+function tokenizeManifestText(text: string) {
+  return text
+    .normalize("NFD")
+    .replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= 3);
+}
+
+/** Ranks manifest domains by token overlap between the client's question and each domain's authored labels/synonyms. */
+export function matchManifestDomains(manifest: SendaManifest, question: string, limit = 2): SendaManifestDomain[] {
+  const questionTokens = new Set(tokenizeManifestText(question));
+  if (!questionTokens.size) return [];
+  return manifest.domains
+    .map((domain) => {
+      const labelTokens = new Set(domain.labels.flatMap((label) => tokenizeManifestText(label)));
+      let overlap = 0;
+      for (const token of labelTokens) if (questionTokens.has(token)) overlap += 1;
+      return { domain, overlap };
+    })
+    .filter((item) => item.overlap > 0)
+    .sort((a, b) => b.overlap - a.overlap)
+    .slice(0, limit)
+    .map((item) => item.domain);
+}
+
 /**
  * Reads repository metadata without changing the checkout. This is the only
  * entrypoint used during onboarding; callers never receive an absolute path.
@@ -337,7 +468,7 @@ function expandRelativeImports(seedPaths: string[], contents: Map<string, string
   return Array.from(imported).slice(0, 3);
 }
 
-export async function researchProjectRepo(params: { repoLocalPath: string | null; question: string }): Promise<RepoResearchResult> {
+export async function researchProjectRepo(params: { repoLocalPath: string | null; question: string; preferredRelativePaths?: string[] }): Promise<RepoResearchResult> {
   const resolved = await resolveAuthorizedRepo(params.repoLocalPath);
   if (!resolved.repoPath) return { repoAvailable: false, reason: resolved.reason, filesScanned: 0, evidence: [] };
   const repoPath = resolved.repoPath;
@@ -345,8 +476,15 @@ export async function researchProjectRepo(params: { repoLocalPath: string | null
   const terms = normalizeQueryTerms(params.question);
   if (!terms.length) return { repoAvailable: true, reason: null, filesScanned: 0, evidence: [] };
 
+  // Paths the client repo's own .senda/project.yml maps to a domain matching this question; a strong,
+  // human-authored prior that keyword scoring alone would otherwise have to rediscover.
+  const preferredAbsolutePaths = (params.preferredRelativePaths ?? [])
+    .map((relativePath) => path.resolve(/* turbopackIgnore: true */ repoPath, relativePath))
+    .filter((absolutePath) => isWithinParent(repoPath, absolutePath));
+
   const knowledgeFiles = await collectSendaKnowledgeFiles(repoPath);
-  const files = await collectCandidateFiles(repoPath, knowledgeFiles);
+  const files = await collectCandidateFiles(repoPath, [...preferredAbsolutePaths, ...knowledgeFiles]);
+  const preferredSet = new Set(preferredAbsolutePaths);
   const contents = new Map<string, string>();
   const scored: Array<{ filePath: string; score: number }> = [];
   for (const filePath of files) {
@@ -356,7 +494,7 @@ export async function researchProjectRepo(params: { repoLocalPath: string | null
     if (content === null) continue;
     contents.set(filePath, content);
     const relativePath = path.relative(/* turbopackIgnore: true */ repoPath, filePath);
-    const score = scoreFile(relativePath, content, terms) + (relativePath.startsWith(".senda") ? 2 : 0);
+    const score = scoreFile(relativePath, content, terms) + (relativePath.startsWith(".senda") ? 2 : 0) + (preferredSet.has(filePath) ? 40 : 0);
     if (score > 0) scored.push({ filePath, score });
   }
   scored.sort((a, b) => b.score - a.score);
