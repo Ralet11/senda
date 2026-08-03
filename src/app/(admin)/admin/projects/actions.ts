@@ -10,7 +10,7 @@ import type {
 import { requireAdmin } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
-import { prepareProjectBrainSync } from "@/lib/project-brain";
+import { buildProjectBrain, prepareProjectBrainSync } from "@/lib/project-brain";
 import { reindexProjectContext } from "@/lib/project-rag";
 import {
   createProjectUpdate,
@@ -347,6 +347,30 @@ export async function prepareProjectBrainSyncAction(projectId: string) {
     `/admin/projects/${projectId}`,
     "success",
     `Fuente validada en ${result.inspection.commitHash?.slice(0, 8)}. El cerebro quedó preparado para su construcción.`,
+  );
+}
+
+export async function buildProjectBrainAction(projectId: string) {
+  await requireAdmin();
+
+  let result: Awaited<ReturnType<typeof buildProjectBrain>>;
+  try {
+    result = await buildProjectBrain(projectId);
+  } catch (error) {
+    console.error("project brain build failed", error);
+    revalidatePath(`/admin/projects/${projectId}`);
+    redirectWithStatus(
+      `/admin/projects/${projectId}`,
+      "error",
+      "No se pudo construir el mapa funcional. La fuente quedó sin cambios; revisá su estado e intentá nuevamente.",
+    );
+  }
+
+  revalidatePath(`/admin/projects/${projectId}`);
+  redirectWithStatus(
+    `/admin/projects/${projectId}`,
+    "success",
+    `Mapa funcional generado: ${result.domains} dominios y ${result.capabilities} capacidades sobre ${result.filesScanned} archivos revisados.`,
   );
 }
 

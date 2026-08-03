@@ -8,6 +8,7 @@ import {
   addMilestoneAction,
   createProjectUpdateAction,
   discardProjectUpdateAction,
+  buildProjectBrainAction,
   publishProjectUpdateAction,
   prepareProjectBrainSyncAction,
   reindexProjectContextAction,
@@ -74,6 +75,12 @@ export default async function AdminProjectDetailPage({
           brainVersions: {
             orderBy: { createdAt: "desc" },
             take: 1,
+            include: {
+              domains: {
+                orderBy: { createdAt: "asc" },
+                include: { capabilities: { orderBy: { createdAt: "asc" } } },
+              },
+            },
           },
         },
       },
@@ -93,6 +100,7 @@ export default async function AdminProjectDetailPage({
   const addActivity = addActivityLogAction.bind(null, projectId);
   const reindexContext = reindexProjectContextAction.bind(null, projectId);
   const prepareBrain = prepareProjectBrainSyncAction.bind(null, projectId);
+  const buildBrain = buildProjectBrainAction.bind(null, projectId);
   const createUpdate = createProjectUpdateAction.bind(null, projectId);
   const draftUpdates = project.updates.filter((update) => update.status === "DRAFT");
   const publishedUpdates = project.updates.filter(
@@ -657,6 +665,15 @@ export default async function AdminProjectDetailPage({
                     className="inline-flex h-9 items-center justify-center rounded-md bg-zinc-950 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </form>
+                {project.repository?.brainStatus === "QUEUED" ? (
+                  <form action={buildBrain} className="mt-2">
+                    <SubmitButton
+                      idleLabel="Construir mapa funcional"
+                      pendingLabel="Analizando proyecto..."
+                      className="inline-flex h-9 items-center justify-center rounded-md border border-emerald-600 bg-emerald-600 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                  </form>
+                ) : null}
                 {project.repository?.brainVersions[0] ? (
                   <p className="mt-2 text-xs text-zinc-500">
                     Última versión: {project.repository.brainVersions[0].status} · {project.repository.brainVersions[0].commitHash.slice(0, 12)}

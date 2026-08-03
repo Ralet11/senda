@@ -185,6 +185,7 @@ model ProjectBrainVersion {
   failureReason String?
   createdAt     DateTime                  @default(now())
   domains       ProjectBrainDomain[]
+  capabilities  ProjectBrainCapability[]
   evidence      ProjectBrainEvidence[]
 
   @@unique([projectId, commitHash])
@@ -193,9 +194,27 @@ model ProjectBrainVersion {
 
 // Dominio funcional apto para explicar al cliente, no una copia del código.
 model ProjectBrainDomain {
+  id             String                   @id @default(cuid())
+  brainVersion   ProjectBrainVersion      @relation(fields: [brainVersionId], references: [id], onDelete: Cascade)
+  brainVersionId String
+  key            String
+  name           String
+  description    String
+  confidence     String
+  createdAt      DateTime                 @default(now())
+  capabilities   ProjectBrainCapability[]
+  evidence       ProjectBrainEvidence[]
+
+  @@unique([brainVersionId, key])
+}
+
+// Capacidad funcional concreta, derivada de un dominio y respaldada por evidencia.
+model ProjectBrainCapability {
   id             String                 @id @default(cuid())
   brainVersion   ProjectBrainVersion    @relation(fields: [brainVersionId], references: [id], onDelete: Cascade)
   brainVersionId String
+  domain         ProjectBrainDomain?    @relation(fields: [domainId], references: [id], onDelete: SetNull)
+  domainId       String?
   key            String
   name           String
   description    String
@@ -204,6 +223,7 @@ model ProjectBrainDomain {
   evidence       ProjectBrainEvidence[]
 
   @@unique([brainVersionId, key])
+  @@index([domainId])
 }
 
 // Evidencia interna: nunca se entrega al cliente ni se usa para exponer código.
@@ -213,6 +233,8 @@ model ProjectBrainEvidence {
   brainVersionId String
   domain         ProjectBrainDomain?      @relation(fields: [domainId], references: [id], onDelete: Cascade)
   domainId       String?
+  capability     ProjectBrainCapability?  @relation(fields: [capabilityId], references: [id], onDelete: Cascade)
+  capabilityId   String?
   kind           ProjectBrainEvidenceKind
   relativePath   String
   lineStart      Int?
@@ -223,6 +245,7 @@ model ProjectBrainEvidence {
 
   @@index([brainVersionId])
   @@index([domainId])
+  @@index([capabilityId])
 }
 
 // Casos de control que el equipo puede aprobar antes de habilitar el cerebro al cliente.

@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { createHash } from "node:crypto";
 
 const execFileAsync = promisify(execFile);
 
@@ -23,6 +24,8 @@ const MAX_SENDA_KNOWLEDGE_FILES = 32;
 const MAX_CAPABILITY_CANDIDATE_FILES = 700;
 const MAX_CAPABILITY_EVIDENCE_FILES = 18;
 const MAX_CAPABILITY_EVIDENCE_CHARS = 1_800;
+const MAX_BRAIN_SOURCES = 42;
+const MAX_BRAIN_SOURCE_CHARS = 1_400;
 
 export type RepoResearchEvidence = {
   /** Internal-only. Never send this object to the browser. */
@@ -45,6 +48,22 @@ export type RepositoryInspection = {
   commitHash: string | null;
   defaultBranch: string | null;
   worktreeDirty: boolean;
+};
+
+export type ProjectBrainSourceKind = "PROJECT_DOC" | "DOMAIN_DOC" | "SCHEMA" | "API" | "SERVICE" | "UI" | "TEST";
+
+export type ProjectBrainSource = {
+  kind: ProjectBrainSourceKind;
+  relativePath: string;
+  excerpt: string;
+  fingerprint: string;
+};
+
+export type ProjectBrainSourceResult = {
+  repoAvailable: boolean;
+  reason: string | null;
+  filesScanned: number;
+  sources: ProjectBrainSource[];
 };
 
 const RELATED_TERMS: Record<string, string[]> = {
@@ -213,6 +232,29 @@ function buildCapabilityExcerpt(content: string) {
   return lines.slice(start, Math.min(lines.length, start + 42)).join("\n");
 }
 
+function inferProjectBrainSourceKind(relativePath: string): ProjectBrainSourceKind | null {
+  const normalized = relativePath.replace(/\\/g, "/").toLowerCase();
+  if (isCapabilityInstructionFile(normalized)) return null;
+  if (/^\.senda\/domains\//.test(normalized)) return "DOMAIN_DOC";
+  if (/^\.senda\//.test(normalized) || /(^|\/)(readme|docs?)\//.test(normalized) || /(^|\/)readme\.md$/.test(normalized)) return "PROJECT_DOC";
+  if (/(^|\/)(schema\.prisma|models?\/|entities?\/)/.test(normalized)) return "SCHEMA";
+  if (/(^|\/)(api\/|routes?\/|controllers?\/)/.test(normalized)) return "API";
+  if (/(^|\/)(services?|usecases?|providers?)\//.test(normalized)) return "SERVICE";
+  if (/(^|\/)(tests?|__tests__|specs?)\//.test(normalized) || /\.(test|spec)\.[^.]+$/.test(normalized)) return "TEST";
+  if (/(^|\/)(app\/|pages?\/|screens?\/|features?\/|components?\/)/.test(normalized)) return "UI";
+  return null;
+}
+
+function brainExcerpt(content: string) {
+  const lines = content.split(/\r?\n/);
+  const matches = lines
+    .map((line, index) => ({ line, index }))
+    .filter(({ line }) => /\b(router|route|controller|service|model|schema|create|update|delete|booking|reservation|payment|trip|shipment|delivery|search|checkout|publish|notification|auth)\b/i.test(line))
+    .slice(0, 3);
+  if (!matches.length) return lines.slice(0, 36).join("\n");
+  return matches.map(({ index }) => lines.slice(Math.max(0, index - 4), Math.min(lines.length, index + 12)).join("\n")).join("\n---\n");
+}
+
 async function resolveAuthorizedRepo(repoLocalPath: string | null) {
   if (!process.env.PROJECT_REPOS_ROOT?.trim()) return { repoPath: null, reason: "La investigacion del repositorio no esta habilitada." };
   let repoPath: string | null;
@@ -354,4 +396,61 @@ export async function researchProjectCapabilities(params: { repoLocalPath: strin
   }));
 
   return { repoAvailable: true, reason: null, filesScanned: files.length, evidence: evidence.filter((item): item is RepoResearchEvidence => item !== null) };
+}
+
+/**
+ * Produces a bounded, redacted and diversified corpus for a versioned project
+ * brain. It is read-only and intentionally keeps repository instructions out.
+ */
+export async function collectProjectBrainSources(params: { repoLocalPath: string | null }): Promise<ProjectBrainSourceResult> {
+  const resolved = await resolveAuthorizedRepo(params.repoLocalPath);
+  if (!resolved.repoPath) return { repoAvailable: false, reason: resolved.reason, filesScanned: 0, sources: [] };
+  const repoPath = resolved.repoPath;
+  const knowledgeFiles = await collectSendaKnowledgeFiles(repoPath);
+  const files = await collectCandidateFiles(repoPath, knowledgeFiles, MAX_CAPABILITY_CANDIDATE_FILES);
+  const perKindLimit: Record<ProjectBrainSourceKind, number> = {
+    PROJECT_DOC: 6,
+    DOMAIN_DOC: 6,
+    SCHEMA: 6,
+    API: 9,
+    SERVICE: 9,
+    UI: 4,
+    TEST: 4,
+  };
+  const usedByKind: Record<ProjectBrainSourceKind, number> = {
+    PROJECT_DOC: 0,
+    DOMAIN_DOC: 0,
+    SCHEMA: 0,
+    API: 0,
+    SERVICE: 0,
+    UI: 0,
+    TEST: 0,
+  };
+  const candidates = files
+    .map((filePath) => {
+      const relativePath = path.relative(/* turbopackIgnore: true */ repoPath, filePath);
+      return { filePath, relativePath, kind: inferProjectBrainSourceKind(relativePath), score: capabilityPriority(relativePath) };
+    })
+    .filter((item): item is { filePath: string; relativePath: string; kind: ProjectBrainSourceKind; score: number } => item.kind !== null && item.score > 0)
+    .sort((a, b) => b.score - a.score || a.relativePath.localeCompare(b.relativePath));
+
+  const sources: ProjectBrainSource[] = [];
+  for (const candidate of candidates) {
+    if (sources.length >= MAX_BRAIN_SOURCES || usedByKind[candidate.kind] >= perKindLimit[candidate.kind]) continue;
+    const stat = await fs.stat(/* turbopackIgnore: true */ candidate.filePath).catch(() => null);
+    if (!stat?.isFile() || stat.size > MAX_FILE_SIZE_BYTES) continue;
+    const content = await fs.readFile(/* turbopackIgnore: true */ candidate.filePath, "utf8").catch(() => null);
+    if (content === null) continue;
+    const excerpt = redactSensitiveValues(brainExcerpt(content)).slice(0, MAX_BRAIN_SOURCE_CHARS).trim();
+    if (!excerpt) continue;
+    sources.push({
+      kind: candidate.kind,
+      relativePath: candidate.relativePath,
+      excerpt,
+      fingerprint: createHash("sha256").update(`${candidate.relativePath}\n${excerpt}`).digest("hex"),
+    });
+    usedByKind[candidate.kind] += 1;
+  }
+
+  return { repoAvailable: true, reason: null, filesScanned: files.length, sources };
 }
