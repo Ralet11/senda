@@ -264,6 +264,19 @@ model ProjectBrainEvaluation {
   @@index([projectId, isActive])
 }
 
+// Registro liviano de errores de backend, redactado, para el panel /admin/console. No reemplaza
+// los logs de PM2: es una vista rapida desde el navegador para no tener que entrar por SSH.
+model ErrorLog {
+  id        String   @id @default(cuid())
+  source    String
+  message   String
+  detail    String?
+  projectId String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 model ProjectMember {
   id        String            @id @default(cuid())
   role      ProjectMemberRole

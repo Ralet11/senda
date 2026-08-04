@@ -1,4 +1,5 @@
 import "server-only";
+import { logServerError } from "@/lib/error-log";
 import { prisma } from "@/lib/prisma";
 import { collectProjectBrainSources, inspectAuthorizedRepository, type ProjectBrainSource } from "@/lib/project-repo";
 
@@ -212,6 +213,7 @@ export async function buildProjectBrain(projectId: string) {
     return { versionId: version.id, filesScanned: sourceResult.filesScanned, domains: draft.length, capabilities: draft.reduce((total, domain) => total + domain.capabilities.length, 0) };
   } catch (error) {
     const reason = error instanceof Error && /^(OPENAI_|PROJECT_BRAIN_)/.test(error.message) ? error.message : "PROJECT_BRAIN_BUILD_FAILED";
+    await logServerError("projectBrain.build", error, { projectId });
     await prisma.$transaction([
       prisma.projectBrainVersion.update({ where: { id: version.id }, data: { status: "FAILED", failureReason: reason } }),
       prisma.projectRepository.update({ where: { id: repository.id }, data: { brainStatus: "FAILED", lastError: "No se pudo construir el mapa funcional. Revisá el estado de la fuente e intentá nuevamente." } }),

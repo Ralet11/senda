@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { persistGeneratedChatImage, readChatImage, removeChatImage } from "@/lib/chat-attachments";
+import { logServerError } from "@/lib/error-log";
 import { getBrainEvidence } from "@/lib/project-brain";
 import { loadSendaManifest, matchManifestDomains, researchProjectCapabilities, researchProjectRepo, type RepoResearchResult } from "@/lib/project-repo";
 
@@ -218,7 +219,7 @@ async function classifyIntent(message: string, hasImage: boolean, generateVisual
       };
     }
   } catch (error) {
-    console.error("assistant intent classification failed", error);
+    await logServerError("assistant.classifyIntent", error, { extra: `message="${message.slice(0, 160)}"` });
   }
 
   // A failure must not silently convert an undefined request into a technical claim.
@@ -385,7 +386,7 @@ async function runRepositoryResearchAgent(question: string, repoLocalPath: strin
     const findings = parseTechnicalFindings(extractOutputText(finalOutput), evidenceTexts.length);
     return { attempted: true, usedEvidence: findings.length > 0, evidenceCount: evidenceTexts.length, findings, reason: findings.length ? null : "La evidencia encontrada no permite confirmar una respuesta funcional.", capabilityMap: overview };
   } catch (error) {
-    console.error("assistant repository agent failed", error);
+    await logServerError("assistant.researchAgent", error, { projectId, extra: `question="${question.slice(0, 160)}" overview=${overview}` });
     return { attempted: true, usedEvidence: false, evidenceCount: 0, findings: [], reason: "La investigación técnica tardó demasiado o no pudo completarse. No voy a responder con supuestos.", capabilityMap: overview };
   }
 }
@@ -457,7 +458,7 @@ async function composeProposalDraft(message: string, history: Array<{ role: "use
     ]);
     return parseProposalDraft(response, message);
   } catch (error) {
-    console.error("assistant proposal composition failed", error);
+    await logServerError("assistant.proposalComposition", error, { extra: `message="${message.slice(0, 160)}"` });
     return parseProposalDraft("", message);
   }
 }

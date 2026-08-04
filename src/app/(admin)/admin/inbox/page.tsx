@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { SubmitButton } from "@/components/admin/submit-button";
 import { prisma } from "@/lib/prisma";
 import { reviewProposalAction } from "./actions";
@@ -44,14 +45,19 @@ export default async function AdminInboxPage() {
   return (
     <main className="min-h-screen bg-zinc-50">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
-        <div className="border-b border-zinc-200 pb-5">
-          <p className="text-sm font-medium text-zinc-500">Senda</p>
-          <h1 className="mt-1 text-2xl font-semibold text-zinc-950">
-            Bandeja de propuestas
-          </h1>
-          <p className="mt-1 text-sm text-zinc-600">
-            Pedidos accionables detectados por el assistant para revisión interna.
-          </p>
+        <div className="flex flex-col gap-3 border-b border-zinc-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-medium text-zinc-500">Senda</p>
+            <h1 className="mt-1 text-2xl font-semibold text-zinc-950">
+              Bandeja de propuestas
+            </h1>
+            <p className="mt-1 text-sm text-zinc-600">
+              Pedidos accionables detectados por el assistant para revisión interna.
+            </p>
+          </div>
+          <Link href="/admin/console" className="text-sm font-medium text-zinc-500 hover:text-zinc-900">
+            Consola de errores
+          </Link>
         </div>
 
         {proposals.length === 0 ? (

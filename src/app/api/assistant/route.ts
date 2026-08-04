@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAssistantReply } from "@/lib/assistant";
 import { requireProjectMember } from "@/lib/auth";
+import { logServerError } from "@/lib/error-log";
 import { prisma } from "@/lib/prisma";
 import { consumeRateLimit } from "@/lib/rate-limit";
 
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(result);
   } catch (error) {
-    console.error("assistant route error", error);
+    await logServerError("assistant.route", error, { projectId });
     const code = error instanceof Error ? error.message : "ASSISTANT_ERROR";
 
     if (code === "OPENAI_API_KEY_MISSING") {

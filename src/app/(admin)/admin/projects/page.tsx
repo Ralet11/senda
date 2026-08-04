@@ -66,7 +66,12 @@ export default async function AdminProjectsPage({
               Alta de clientes, carga manual de fase, avance y seguimiento.
             </p>
           </div>
-          <LogoutButton />
+          <div className="flex items-center gap-4">
+            <Link href="/admin/console" className="text-sm font-medium text-zinc-500 hover:text-zinc-900">
+              Consola de errores
+            </Link>
+            <LogoutButton />
+          </div>
         </div>
 
         {success ? (
