@@ -162,7 +162,7 @@ async function callOpenAIResponse(messages: OpenAIMessage[], timeoutMs = 20_000)
     response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: process.env.OPENAI_MODEL || "gpt-5", input: messages }),
+      body: JSON.stringify({ model: process.env.OPENAI_MODEL || "gpt-5", reasoning: { effort: "low" }, input: messages }),
       signal: controller.signal,
     });
   } catch (error) {
@@ -291,7 +291,7 @@ async function runRepositoryResearchAgent(question: string, repoLocalPath: strin
       const response = await fetch("https://api.openai.com/v1/responses", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: process.env.OPENAI_MODEL || "gpt-5", store: false, ...body }),
+        body: JSON.stringify({ model: process.env.OPENAI_MODEL || "gpt-5", store: false, reasoning: { effort: "low" }, ...body }),
         signal: controller.signal,
       });
       const data = await response.json().catch(() => null) as { output?: unknown[]; error?: { message?: string } } | null;
@@ -338,7 +338,7 @@ async function runRepositoryResearchAgent(question: string, repoLocalPath: strin
             parameters: { type: "object", additionalProperties: false, properties: { query: { type: "string", description: "Nueva consulta con un ángulo distinto (otro sinónimo, actor o flujo)." } }, required: ["query"] },
           }],
           tool_choice: "auto",
-          max_output_tokens: 200,
+          max_output_tokens: 500,
         }, 8_000);
         const call = findSearchToolCall(decisionOutput);
         if (!call?.call_id) break;
@@ -369,7 +369,12 @@ async function runRepositoryResearchAgent(question: string, repoLocalPath: strin
         { role: "system", content: buildResearchSynthesisPrompt(overview) },
         { role: "user", content: `Pregunta del cliente: ${question}\n\nEvidencia:\n${evidenceTexts.map((text, index) => `[${index + 1}] ${text}`).join("\n\n")}` },
       ],
-      max_output_tokens: 900,
+      // Reasoning models spend part of this budget on internal reasoning before writing the
+      // visible JSON. Reproduced against production: with the default reasoning effort, 900
+      // tokens was silently starved (status "incomplete", reason "max_output_tokens", zero output
+      // text) on real evidence sets. Low effort (set on every request() call above) plus this
+      // higher cap fixed it — verified end to end with the actual llevo evidence.
+      max_output_tokens: 3_000,
     }, 20_000);
     const findings = parseTechnicalFindings(extractOutputText(finalOutput), evidenceTexts.length);
     return { attempted: true, usedEvidence: findings.length > 0, evidenceCount: evidenceTexts.length, findings, reason: findings.length ? null : "La evidencia encontrada no permite confirmar una respuesta funcional.", capabilityMap: overview };

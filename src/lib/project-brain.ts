@@ -93,6 +93,11 @@ async function callBrainModel(sources: ProjectBrainSource[]) {
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model: process.env.OPENAI_BRAIN_MODEL || process.env.OPENAI_MODEL || "gpt-5",
+      // Low effort avoids the reasoning step silently eating the whole output budget before any
+      // JSON gets written (reproduced and fixed for the same call shape in assistant.ts). The
+      // output here can be large (up to 10 domains x 8 capabilities), so give it real headroom.
+      reasoning: { effort: "low" },
+      max_output_tokens: 6_000,
       input: [{
         role: "system",
         content: [
