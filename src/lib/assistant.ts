@@ -281,8 +281,14 @@ async function runRepositoryResearchAgent(question: string, repoLocalPath: strin
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { attempted: true, usedEvidence: false, evidenceCount: 0, findings: [], reason: "La investigación técnica no está configurada.", capabilityMap: overview };
 
-  const deadline = Date.now() + 28_000;
+  // Nginx's default proxy_read_timeout is 60s (no override configured); this stays comfortably
+  // under that even stacked with classifyIntent's own up-to-8s call before this function starts.
+  const deadline = Date.now() + 42_000;
   const remainingMs = () => deadline - Date.now();
+  // The synthesis call is the one that actually produces the answer — reproduced in production
+  // getting starved when refinement rounds spent the budget first. Reserve its time up front so
+  // rounds only run with what's left over, never the other way around.
+  const SYNTHESIS_RESERVE_MS = 22_000;
 
   const request = async (body: Record<string, unknown>, timeoutMs: number) => {
     const controller = new AbortController();
@@ -323,7 +329,7 @@ async function runRepositoryResearchAgent(question: string, repoLocalPath: strin
       const askedQueries = new Set([question.trim().toLowerCase()]);
       const seenPaths = new Set(repoResearch.evidence.map((item) => item.path));
       let round = 0;
-      while (round < 2 && remainingMs() > 9_000) {
+      while (round < 2 && remainingMs() > SYNTHESIS_RESERVE_MS + 8_000) {
         const decisionOutput = await request({
           input: [
             { role: "system", content: "Sos el planificador interno de Senda. Tenés evidencia preliminar sobre una consulta de cliente. Si ya alcanza para responder con precisión, no llames a ninguna herramienta. Si falta un ángulo (otro sinónimo, actor o flujo), pedí una nueva búsqueda distinta a las anteriores. No respondas al cliente ni inventes hechos." },
@@ -375,7 +381,7 @@ async function runRepositoryResearchAgent(question: string, repoLocalPath: strin
       // text) on real evidence sets. Low effort (set on every request() call above) plus this
       // higher cap fixed it — verified end to end with the actual llevo evidence.
       max_output_tokens: 3_000,
-    }, 20_000);
+    }, SYNTHESIS_RESERVE_MS);
     const findings = parseTechnicalFindings(extractOutputText(finalOutput), evidenceTexts.length);
     return { attempted: true, usedEvidence: findings.length > 0, evidenceCount: evidenceTexts.length, findings, reason: findings.length ? null : "La evidencia encontrada no permite confirmar una respuesta funcional.", capabilityMap: overview };
   } catch (error) {
