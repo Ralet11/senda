@@ -292,12 +292,14 @@ async function runRepositoryResearchAgent(question: string, repoLocalPath: strin
 
   // Nginx's default proxy_read_timeout is 60s (no override configured); this stays comfortably
   // under that even stacked with classifyIntent's own up-to-8s call before this function starts.
-  const deadline = Date.now() + 42_000;
+  const deadline = Date.now() + 48_000;
   const remainingMs = () => deadline - Date.now();
-  // The synthesis call is the one that actually produces the answer — reproduced in production
-  // getting starved when refinement rounds spent the budget first. Reserve its time up front so
-  // rounds only run with what's left over, never the other way around.
-  const SYNTHESIS_RESERVE_MS = 22_000;
+  // The synthesis call is the one that actually produces the answer. Reproduced in production
+  // twice now: a 22s reserve wasn't enough even for a brain-only overview question with zero
+  // refinement rounds and no filesystem scan beforehand — real OpenAI latency variance needs more
+  // margin than the single ~20s sample we'd measured. Reserve its time up front so rounds only run
+  // with whatever's left over, never the other way around.
+  const SYNTHESIS_RESERVE_MS = 32_000;
 
   const request = async (body: Record<string, unknown>, timeoutMs: number) => {
     const controller = new AbortController();
