@@ -222,20 +222,26 @@ export async function buildProjectBrain(projectId: string) {
   }
 }
 
-/** Flattens the latest reviewed brain into short, already-vetted evidence strings for the live research agent. */
-export async function getBrainEvidence(projectId: string, maxItems = 40): Promise<Array<{ content: string }>> {
+export type BrainEvidenceResult = { brainVersionId: string; items: Array<{ content: string }> };
+
+/**
+ * Flattens the latest reviewed brain into short, already-vetted evidence strings for the live
+ * research agent. Returns null (not an empty result) when there's no ready brain at all, so
+ * callers can tell "nothing to say" apart from "brain doesn't exist" for tracing.
+ */
+export async function getBrainEvidence(projectId: string, maxItems = 40): Promise<BrainEvidenceResult | null> {
   const brain = await getReadyProjectBrain(projectId);
-  if (!brain) return [];
+  if (!brain) return null;
   const items: Array<{ content: string }> = [];
   for (const domain of brain.domains) {
     for (const capability of domain.capabilities) {
       items.push({
         content: `[Mapa funcional revisado] ${domain.name} > ${capability.name}: ${capability.description}${capability.confidence === "partial" ? " (confirmado de forma parcial)" : ""}`,
       });
-      if (items.length >= maxItems) return items;
+      if (items.length >= maxItems) return { brainVersionId: brain.id, items };
     }
   }
-  return items;
+  return { brainVersionId: brain.id, items };
 }
 
 /** Client-safe projection of the latest reviewed project brain. Evidence stays internal. */

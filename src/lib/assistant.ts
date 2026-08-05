@@ -60,6 +60,11 @@ type TechnicalResearch = {
   findings: TechnicalFinding[];
   reason: string | null;
   capabilityMap: boolean;
+  /** "project_brain": reviewed brain only. "mixed": brain + live search. "live_research": no usable brain. "none": nothing attempted/found. */
+  source: "project_brain" | "mixed" | "live_research" | "none";
+  brainVersionId: string | null;
+  /** True only when this was a panorama question and the brain existed but wasn't enough on its own. */
+  fallbackUsed: boolean;
 };
 
 type ProposalDraft = {
@@ -278,9 +283,12 @@ function buildResearchSynthesisPrompt(overview: boolean) {
  * of a single forced guess with no way back. Bounded by a wall-clock budget, not a fixed step count,
  * so it stays inside the route's response timeout regardless of how many rounds it takes.
  */
+// A panorama question with a brain this thin isn't worth trusting alone — fall back to live research too.
+const MIN_BRAIN_EVIDENCE_FOR_OVERVIEW = 5;
+
 async function runRepositoryResearchAgent(question: string, repoLocalPath: string | null, overview: boolean, projectId: string): Promise<TechnicalResearch> {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return { attempted: true, usedEvidence: false, evidenceCount: 0, findings: [], reason: "La investigación técnica no está configurada.", capabilityMap: overview };
+  if (!apiKey) return { attempted: true, usedEvidence: false, evidenceCount: 0, findings: [], reason: "La investigación técnica no está configurada.", capabilityMap: overview, source: "none", brainVersionId: null, fallbackUsed: false };
 
   // Nginx's default proxy_read_timeout is 60s (no override configured); this stays comfortably
   // under that even stacked with classifyIntent's own up-to-8s call before this function starts.
@@ -310,19 +318,29 @@ async function runRepositoryResearchAgent(question: string, repoLocalPath: strin
   };
 
   try {
-    const [manifest, brainEvidence] = await Promise.all([loadSendaManifest(repoLocalPath), getBrainEvidence(projectId)]);
+    const [manifest, brainResult] = await Promise.all([loadSendaManifest(repoLocalPath), getBrainEvidence(projectId)]);
+    const brainEvidence = brainResult?.items ?? [];
+    const brainVersionId = brainResult?.brainVersionId ?? null;
     const matchedDomains = manifest ? matchManifestDomains(manifest, question) : [];
     const preferredRelativePaths = matchedDomains.flatMap((domain) => [...domain.codeAreas, ...domain.documentation, ...domain.tests]);
 
+    // A panorama question with a well-populated, reviewed brain doesn't need a fresh filesystem
+    // scan at all — that's strictly the "brain vs re-derive from scratch every time" tradeoff.
+    const brainSufficientForOverview = overview && brainEvidence.length >= MIN_BRAIN_EVIDENCE_FOR_OVERVIEW;
+    const fallbackUsed = overview && !brainSufficientForOverview;
+
     // Search immediately with the client's own question instead of spending a roundtrip asking the model to restate it.
-    const repoResearch = overview
-      ? await researchProjectCapabilities({ repoLocalPath })
-      : await researchProjectRepo({ repoLocalPath, question, preferredRelativePaths });
+    const repoResearch = brainSufficientForOverview
+      ? { repoAvailable: true, reason: null, filesScanned: 0, evidence: [] }
+      : overview
+        ? await researchProjectCapabilities({ repoLocalPath })
+        : await researchProjectRepo({ repoLocalPath, question, preferredRelativePaths });
 
     if (!repoResearch.repoAvailable && !brainEvidence.length) {
-      return { attempted: true, usedEvidence: false, evidenceCount: 0, findings: [], reason: repoResearch.reason || "No encontré evidencia suficiente en la implementación actual.", capabilityMap: overview };
+      return { attempted: true, usedEvidence: false, evidenceCount: 0, findings: [], reason: repoResearch.reason || "No encontré evidencia suficiente en la implementación actual.", capabilityMap: overview, source: "none", brainVersionId, fallbackUsed };
     }
 
+    const source: TechnicalResearch["source"] = brainSufficientForOverview ? "project_brain" : brainEvidence.length ? "mixed" : "live_research";
     let evidenceTexts = [...brainEvidence.map((item) => item.content), ...repoResearch.evidence.map((item) => item.content)];
 
     // Give the model up to two more searches with a different angle (synonym, actor, flow) if the first pass fell short.
@@ -368,7 +386,7 @@ async function runRepositoryResearchAgent(question: string, repoLocalPath: strin
     }
 
     if (!evidenceTexts.length) {
-      return { attempted: true, usedEvidence: false, evidenceCount: 0, findings: [], reason: repoResearch.reason || "No encontré evidencia suficiente en la implementación actual.", capabilityMap: overview };
+      return { attempted: true, usedEvidence: false, evidenceCount: 0, findings: [], reason: repoResearch.reason || "No encontré evidencia suficiente en la implementación actual.", capabilityMap: overview, source: "none", brainVersionId, fallbackUsed };
     }
 
     const finalOutput = await request({
@@ -384,10 +402,10 @@ async function runRepositoryResearchAgent(question: string, repoLocalPath: strin
       max_output_tokens: 3_000,
     }, SYNTHESIS_RESERVE_MS);
     const findings = parseTechnicalFindings(extractOutputText(finalOutput), evidenceTexts.length);
-    return { attempted: true, usedEvidence: findings.length > 0, evidenceCount: evidenceTexts.length, findings, reason: findings.length ? null : "La evidencia encontrada no permite confirmar una respuesta funcional.", capabilityMap: overview };
+    return { attempted: true, usedEvidence: findings.length > 0, evidenceCount: evidenceTexts.length, findings, reason: findings.length ? null : "La evidencia encontrada no permite confirmar una respuesta funcional.", capabilityMap: overview, source, brainVersionId, fallbackUsed };
   } catch (error) {
     await logServerError("assistant.researchAgent", error, { projectId, extra: `question="${question.slice(0, 160)}" overview=${overview}` });
-    return { attempted: true, usedEvidence: false, evidenceCount: 0, findings: [], reason: "La investigación técnica tardó demasiado o no pudo completarse. No voy a responder con supuestos.", capabilityMap: overview };
+    return { attempted: true, usedEvidence: false, evidenceCount: 0, findings: [], reason: "La investigación técnica tardó demasiado o no pudo completarse. No voy a responder con supuestos.", capabilityMap: overview, source: "none", brainVersionId: null, fallbackUsed: false };
   }
 }
 
@@ -565,7 +583,7 @@ export async function createAssistantReply(projectId: string, assistantSessionId
   const [history, imageInputParts] = await Promise.all([getRecentConversation(projectId, assistantSessionId), buildImageInputParts(input.attachments)]);
   const decision = await classifyIntent(message, input.attachments.length > 0, input.generateVisual === true, history);
   let reply: string;
-  let research: TechnicalResearch = { attempted: false, usedEvidence: false, evidenceCount: 0, findings: [], reason: null, capabilityMap: false };
+  let research: TechnicalResearch = { attempted: false, usedEvidence: false, evidenceCount: 0, findings: [], reason: null, capabilityMap: false, source: "none", brainVersionId: null, fallbackUsed: false };
   let proposal: { id: string; title: string; status: string } | null = null;
   let generatedImage: Buffer | null = null;
 
@@ -573,7 +591,7 @@ export async function createAssistantReply(projectId: string, assistantSessionId
     if (isRepositoryAccessRequest(message)) {
       const repo = await researchProjectRepo({ repoLocalPath: project.repoLocalPath, question: message });
       reply = buildRepositoryAccessReply(repo);
-      research = { attempted: true, usedEvidence: repo.repoAvailable, evidenceCount: 0, findings: [], reason: repo.reason, capabilityMap: false };
+      research = { attempted: true, usedEvidence: repo.repoAvailable, evidenceCount: 0, findings: [], reason: repo.reason, capabilityMap: false, source: "none", brainVersionId: null, fallbackUsed: false };
     } else {
       research = await runRepositoryResearchAgent(message, project.repoLocalPath, decision.factScope === "CAPABILITIES", projectId);
       reply = buildFactReply(research);
@@ -628,7 +646,7 @@ export async function createAssistantReply(projectId: string, assistantSessionId
   });
 
   return {
-    reply: { id: result.replyChunk.id, role: "assistant" as const, content: result.replyChunk.content, createdAt: result.replyChunk.createdAt.toISOString(), research: { used: research.usedEvidence, evidenceCount: research.evidenceCount }, attachments: result.generatedAttachment ? [{ ...result.generatedAttachment, url: `/api/chat/attachments/${result.generatedAttachment.id}` }] : [] },
+    reply: { id: result.replyChunk.id, role: "assistant" as const, content: result.replyChunk.content, createdAt: result.replyChunk.createdAt.toISOString(), research: { used: research.usedEvidence, evidenceCount: research.evidenceCount, source: research.source, brainVersionId: research.brainVersionId, fallbackUsed: research.fallbackUsed }, attachments: result.generatedAttachment ? [{ ...result.generatedAttachment, url: `/api/chat/attachments/${result.generatedAttachment.id}` }] : [] },
     userMessage: { id: result.userChunk.id, role: "user" as const, content: result.userChunk.content, createdAt: result.userChunk.createdAt.toISOString(), research: { used: false, evidenceCount: 0 }, attachments: result.userAttachments.map((attachment) => ({ ...attachment, url: `/api/chat/attachments/${attachment.id}` })) },
     proposal,
     intent: decision.intent,
