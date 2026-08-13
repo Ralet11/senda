@@ -87,6 +87,10 @@ Authorization: Bearer <SENDA_AGENT_TOKEN>
 
 Sirve para crear drafts o publicar updates que luego impactan en el portal cliente.
 
+## Ideacion publica para Prisma Devs
+
+La landing de Prisma usa `POST /api/public/ideation` para construir un primer mapa de producto en pocos intercambios y mantenerlo abierto a correcciones posteriores. La integracion, variables y contrato estan documentados en [docs/public-ideation.md](./docs/public-ideation.md).
+
 ## Deploy en EC2
 
 Guia operativa:
