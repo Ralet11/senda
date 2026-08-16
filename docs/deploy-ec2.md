@@ -68,8 +68,6 @@ Completar al menos:
 DATABASE_URL="postgresql://senda_user:CAMBIAR_PASSWORD@127.0.0.1:5432/senda?schema=public"
 OPENAI_API_KEY="sk-..."
 OPENAI_MODEL="gpt-5"
-SENDA_AGENT_TOKEN="token-largo-y-unico"
-PROJECT_REPOS_ROOT="/home/ubuntu/repos"
 NODE_ENV="production"
 PORT="3010"
 ```
@@ -184,8 +182,8 @@ Validar:
 - dashboard cliente
 - chat
 - assistant
-- `POST /api/external/project-updates`
-- assistant con una pregunta técnica sobre un repo dentro de `PROJECT_REPOS_ROOT`
+- `POST /api/external/v1/sync` con una clave limitada por proyecto
+- assistant con una pregunta funcional documentada dentro de `.senda/knowledge/`
 
 ## 11. Flujo de actualizacion de codigo
 
@@ -229,16 +227,16 @@ que `node_modules/.bin/next` exista antes de iniciar Senda.
 ## 12. Comando de smoke test del endpoint externo
 
 ```bash
-curl -X POST https://senda.prismadevs.com/api/external/project-updates \
-  -H "Authorization: Bearer TU_TOKEN" \
+curl -X POST https://senda.prismadevs.com/api/external/v1/sync \
+  -H "Authorization: Bearer senda_pt_TU_TOKEN_DE_PROYECTO" \
+  -H "Idempotency-Key: smoke-test-000000000000" \
   -H "Content-Type: application/json" \
   -d '{
-    "projectId": "seed-project",
-    "title": "Update desde agente",
-    "summary": "Se publico una actualizacion de prueba desde el endpoint externo.",
-    "kind": "CLIENT",
-    "publish": true,
-    "agentName": "manual-smoke-test"
+    "version": 1,
+    "action": "tasks",
+    "projectId": "ID_DEL_PROYECTO_ASOCIADO_AL_TOKEN",
+    "agent": "manual-smoke-test",
+    "tasks": [{ "id": "smoke-task", "title": "Tarea de prueba", "status": "IDEAS", "priority": 2 }]
   }'
 ```
 
@@ -247,5 +245,5 @@ curl -X POST https://senda.prismadevs.com/api/external/project-updates \
 - No compartir la DB con otros proyectos.
 - No reutilizar puertos ya usados (`3001`, `3005`, `4000`).
 - Mantener Senda aislado en `3010`.
-- `PROJECT_REPOS_ROOT` es obligatorio para habilitar búsquedas de código del assistant. Debe contener únicamente repos permitidos y nunca rutas amplias del servidor.
+- Senda no requiere ni debe tener `PROJECT_REPOS_ROOT`: la CLI sincroniza exclusivamente `.senda/knowledge/` como snapshot documental.
 - El server actual ya tiene otros proyectos; cualquier cambio en Nginx debe pasar por `nginx -t` antes de recargar.

@@ -9,7 +9,6 @@
     "start:prod": "next start -p 3010",
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
-    "repos:sync": "tsx scripts/sync-repo-clones.ts",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:generate": "prisma generate"
   },

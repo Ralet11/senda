@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "milestones": [
+    { "id": "example-first-release", "title": "Primera versión validable", "dueDate": null, "done": false }
+  ]
+}

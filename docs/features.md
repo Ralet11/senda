@@ -25,7 +25,7 @@ con el equipo, y discutan ideas con un AI assistant que conoce el contexto del p
 - Adjuntar archivos/imágenes.
 
 ### 4. AI assistant (por proyecto)
-- Conocimiento funcional desde documentación curada en `.senda/**/*.md`.
+- Conocimiento funcional desde documentación curada en `.senda/knowledge/**/*.md`.
 - Estado operativo desde PostgreSQL: fase, avance, hitos y actividad.
 - El cliente puede preguntar estado, discutir ideas, pedir aclaraciones.
 - Si falta documentación, el cliente puede enviar la pregunta a Prisma para recibir una respuesta humana.

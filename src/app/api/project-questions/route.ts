@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
   const session = await prisma.assistantSession.findFirst({
     where: { id: sessionId, projectId, userId: user.id },
-    select: { id: true, project: { select: { repoLocalPath: true } } },
+    select: { id: true },
   });
   if (!session) return NextResponse.json({ error: "No tenés acceso a esta conversación." }, { status: 403 });
 
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   });
   if (existing) return NextResponse.json({ question: existing });
 
-  const knowledge = await inspectProjectKnowledge(session.project.repoLocalPath);
+  const knowledge = await inspectProjectKnowledge(projectId);
   const created = await prisma.projectQuestion.create({
     data: {
       projectId,

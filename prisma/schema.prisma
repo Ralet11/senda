@@ -69,13 +69,16 @@ enum DevTaskStatus {
   DONE
 }
 
-enum ProjectConversationKind {
-  DIRECT
+enum ProjectAgentTokenScope {
+  KNOWLEDGE_WRITE
+  TASKS_WRITE
+  MILESTONES_WRITE
+  PROJECT_STATE_WRITE
+  UPDATES_WRITE
 }
 
-enum RepositorySourceKind {
-  LOCAL_CHECKOUT
-  GIT_MIRROR
+enum ProjectConversationKind {
+  DIRECT
 }
 
 enum ProjectQuestionStatus {
@@ -130,10 +133,6 @@ model Project {
   phase             ProjectPhase @default(DISCOVERY)
   progress          Int          @default(0) // 0-100
   summary           String? // brief usado como contexto del AI assistant
-  repoProvider      String?
-  repoLocalPath     String?
-  repoDefaultBranch String?
-  repoUrl           String? // git remote (SSH) que scripts/sync-repo-clones.ts clona/actualiza; repoLocalPath queda auto-gestionado cuando este campo esta seteado
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
@@ -147,9 +146,11 @@ model Project {
   proposals         Proposal[]
   contextChunks     ProjectContextChunk[]
   updates           ProjectUpdate[]
-  repository        ProjectRepository?
+  knowledgeDocuments ProjectKnowledgeDocument[]
   questions         ProjectQuestion[]
   devTasks          DevTask[]
+  agentTokens       ProjectAgentToken[]
+  agentSyncEvents   ProjectAgentSyncEvent[]
 }
 
 model DevTask {
@@ -160,26 +161,64 @@ model DevTask {
   description String?
   status      DevTaskStatus @default(IDEAS)
   priority    Int           @default(2)
+  externalRef String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
   @@index([projectId, status, updatedAt])
+  @@unique([projectId, externalRef])
+}
+
+// Credenciales de integracion por proyecto. Solo se conserva el hash del token;
+// el valor en claro se entrega una vez al crearla y se puede revocar en cualquier momento.
+model ProjectAgentToken {
+  id          String                    @id @default(cuid())
+  project     Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String
+  label       String
+  tokenHash   String                    @unique
+  scopes      ProjectAgentTokenScope[]
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime                  @default(now())
+  syncEvents  ProjectAgentSyncEvent[]
+
+  @@index([projectId, revokedAt])
+}
+
+// Hace idempotente cada envio de la CLI: reintentar una misma operacion no duplica tareas,
+// hitos ni updates si la red se corta despues de que Senda acepto el request.
+model ProjectAgentSyncEvent {
+  id             String             @id @default(cuid())
+  project        Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId      String
+  token          ProjectAgentToken  @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  tokenId        String
+  idempotencyKey String
+  action         String
+  payloadHash    String
+  resultJson     String
+  createdAt      DateTime           @default(now())
+
+  @@unique([tokenId, idempotencyKey])
+  @@index([projectId, createdAt])
 }
 
 // Fuente autorizada de lectura. Nunca contiene tokens, credenciales ni URLs privadas.
-model ProjectRepository {
-  id             String               @id @default(cuid())
-  project        Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  projectId      String               @unique
-  kind           RepositorySourceKind @default(LOCAL_CHECKOUT)
-  relativePath   String
-  defaultBranch  String?
-  lastSeenCommit String?
-  lastSeenAt     DateTime?
-  worktreeDirty  Boolean              @default(false)
-  lastError      String?
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
+// Snapshot documental enviado por la CLI. Senda nunca conserva el repositorio ni código fuente.
+model ProjectKnowledgeDocument {
+  id           String   @id @default(cuid())
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId    String
+  path         String
+  content      String
+  checksum     String
+  sourceCommit String?
+  syncedAt     DateTime @default(now())
+
+  @@unique([projectId, path])
+  @@index([projectId, syncedAt])
 }
 
 // El conocimiento funcional ya no se deriva del codigo: se lee desde `.senda/**/*.md`.
@@ -231,7 +270,10 @@ model Milestone {
   title     String
   dueDate   DateTime?
   doneAt    DateTime?
+  externalRef String?
   createdAt DateTime  @default(now())
+
+  @@unique([projectId, externalRef])
 }
 
 model ActivityLog {

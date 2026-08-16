@@ -8,10 +8,10 @@ Incluye:
 - dashboard cliente
 - chat por proyecto
 - assistant con contexto del proyecto
-- conocimiento funcional versionado en `.senda/**/*.md`
+- conocimiento funcional versionado en `.senda/knowledge/**/*.md`
 - preguntas sin respuesta derivadas al equipo de Prisma
 - panel admin
-- endpoint externo para updates desde agentes
+- CLI y API con permisos por proyecto para sincronización de agentes
 
 ## Stack
 
@@ -71,23 +71,22 @@ Variables importantes:
 - `DATABASE_URL`
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL`
-- `SENDA_AGENT_TOKEN`
 
 ## Endpoint externo para agentes
 
 Ruta:
 
 ```txt
-POST /api/external/project-updates
+POST /api/external/v1/sync
 ```
 
 Autenticacion:
 
 ```txt
-Authorization: Bearer <SENDA_AGENT_TOKEN>
+Authorization: Bearer <SENDA_TOKEN_DEL_PROYECTO>
 ```
 
-Sirve para crear drafts o publicar updates que luego impactan en el portal cliente.
+La clave se crea desde Configuración del proyecto, tiene permisos mínimos y sólo puede modificar ese proyecto. La CLI sincroniza la documentación curada, tareas, hitos, estado y borradores; nunca publica un update al cliente automáticamente. Senda no clona repositorios. Ver [docs/senda-cli.md](./docs/senda-cli.md).
 
 ## Ideacion publica para Prisma Devs
 

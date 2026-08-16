@@ -42,11 +42,6 @@ function parseOptionalDate(value: string) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function parseOptionalRepoValue(value: string) {
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-}
-
 function redirectWithStatus(
   path: string,
   kind: "error" | "success",
@@ -70,9 +65,6 @@ export async function createProjectAction(formData: FormData) {
   const clientEmail = getString(formData, "clientEmail").toLowerCase();
   const clientPassword = getString(formData, "clientPassword");
   const memberRole = getString(formData, "memberRole");
-  const repoProvider = parseOptionalRepoValue(getString(formData, "repoProvider"));
-  const repoLocalPath = parseOptionalRepoValue(getString(formData, "repoLocalPath"));
-  const repoDefaultBranch = parseOptionalRepoValue(getString(formData, "repoDefaultBranch"));
 
   if (!name) {
     redirectWithStatus("/admin/projects", "error", "El proyecto necesita un nombre.");
@@ -137,9 +129,6 @@ export async function createProjectAction(formData: FormData) {
       data: {
         name,
         summary: summary || null,
-        repoProvider,
-        repoLocalPath,
-        repoDefaultBranch,
         phase: projectPhase,
         progress: projectProgress,
         members: {
@@ -215,23 +204,6 @@ export async function updateProjectAction(projectId: string, formData: FormData)
   revalidatePath("/admin/projects");
   revalidatePath(`/admin/projects/${projectId}`);
   redirectWithStatus(`/admin/projects/${projectId}`, "success", "Proyecto actualizado.");
-}
-
-/** Configuración del repositorio que el assistant usa como fuente (pestaña Configuración). */
-export async function updateProjectRepoAction(projectId: string, formData: FormData) {
-  await requireAdmin();
-
-  const repoProvider = parseOptionalRepoValue(getString(formData, "repoProvider"));
-  const repoLocalPath = parseOptionalRepoValue(getString(formData, "repoLocalPath"));
-  const repoDefaultBranch = parseOptionalRepoValue(getString(formData, "repoDefaultBranch"));
-
-  await prisma.project.update({
-    where: { id: projectId },
-    data: { repoProvider, repoLocalPath, repoDefaultBranch },
-  });
-
-  revalidatePath(`/admin/projects/${projectId}`);
-  redirectWithStatus(`/admin/projects/${projectId}`, "success", "Configuración actualizada.", "config");
 }
 
 export async function addMilestoneAction(projectId: string, formData: FormData) {

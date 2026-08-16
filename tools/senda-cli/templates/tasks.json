@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "tasks": [
+    { "id": "example-discovery", "title": "Definir alcance funcional", "description": "Validar el flujo principal y documentar decisiones pendientes.", "status": "IDEAS", "priority": 2 }
+  ]
+}

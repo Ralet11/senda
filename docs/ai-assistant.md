@@ -4,23 +4,22 @@ Senda responde preguntas funcionales desde documentación explícita y apta para
 
 ## Fuente autorizada
 
-Cada repositorio enlazado debe incluir un directorio `.senda/` con archivos Markdown:
+Cada repositorio enlazado debe incluir documentación funcional aprobada en `.senda/knowledge/`:
 
 ```text
 .senda/
-  README.md
-  faq.md
-  glossary.md
-  domains/
-    usuarios.md
-    pagos.md
-  decisions/
-    reglas-importantes.md
+  knowledge/
+    README.md
+    faq.md
+    glossary.md
+    domains/
+      usuarios.md
+      pagos.md
 ```
 
-Hay archivos iniciales para copiar en [`docs/project-knowledge-template`](./project-knowledge-template/README.md).
+La forma recomendada de crearla es `npx @prismadevs/senda-cli init --project-id <id>`.
 
-`README.md` presenta el producto. Los documentos de `domains/` explican flujos, reglas, límites y capacidades. La documentación no debe contener secretos, código, rutas internas ni instrucciones para el modelo.
+`README.md` presenta el producto. Los documentos de `domains/` explican flujos, reglas, límites y capacidades. La documentación no debe contener secretos, código, rutas internas ni instrucciones para el modelo. Los manifiestos operativos y las instrucciones para agentes quedan fuera de `knowledge/`, por lo que Senda AI nunca los lee.
 
 Senda admite hasta 48 documentos de 128 KB cada uno. Divide el contenido por encabezados Markdown y selecciona como máximo ocho secciones relacionadas con la pregunta. La respuesta sólo se acepta cuando el modelo puede vincular cada afirmación con una sección recuperada.
 
@@ -38,15 +37,6 @@ La pregunta aparece en `/admin/inbox`. Cuando el equipo responde:
 
 Las preguntas sobre fase, avance, hitos y actividad se responden directamente desde PostgreSQL. Esa información cambia con frecuencia y no se duplica dentro de `.senda/`.
 
-## Repositorios
+## Sincronización documental
 
-`PROJECT_REPOS_ROOT` debe apuntar a un directorio controlado exclusivamente por Senda. `Project.repoLocalPath` siempre se resuelve como descendiente estricto de esa raíz.
-
-Para mirrors propios:
-
-1. Configurar `Project.repoUrl` con el remoto SSH.
-2. Guardar una deploy key de sólo lectura en `SENDA_REPO_KEYS_DIR/<projectId>`.
-3. Ejecutar `npm run repos:sync` para clonar o actualizar el mirror.
-4. Programar la sincronización periódica en el EC2.
-
-Las claves viven fuera de `PROJECT_REPOS_ROOT`. La lectura del assistant queda limitada a `.senda/**/*.md`.
+Senda no clona ni almacena el repositorio del cliente. La CLI envía exclusivamente el snapshot de `.senda/knowledge/**/*.md` a través de una clave revocable y limitada a ese proyecto. El resto del repositorio, incluido código, Git, secretos y archivos de infraestructura, nunca llega al EC2 de Senda.

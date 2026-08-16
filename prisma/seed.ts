@@ -55,9 +55,6 @@ async function main() {
       progress: 68,
       summary:
         "Portal cliente para seguimiento del proyecto, chat con el equipo y assistant con contexto del producto.",
-      repoProvider: "LOCAL",
-      repoLocalPath: ".",
-      repoDefaultBranch: "main",
     },
     create: {
       id: "seed-project",
@@ -66,9 +63,6 @@ async function main() {
       progress: 68,
       summary:
         "Portal cliente para seguimiento del proyecto, chat con el equipo y assistant con contexto del producto.",
-      repoProvider: "LOCAL",
-      repoLocalPath: ".",
-      repoDefaultBranch: "main",
     },
   });
 

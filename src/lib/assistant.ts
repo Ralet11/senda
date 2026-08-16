@@ -260,9 +260,9 @@ function buildResearchSynthesisPrompt(overview: boolean) {
   ].join("\n");
 }
 
-async function researchProjectDocumentation(question: string, repoLocalPath: string | null, overview: boolean, projectId: string): Promise<TechnicalResearch> {
+async function researchProjectDocumentation(question: string, overview: boolean, projectId: string): Promise<TechnicalResearch> {
   try {
-    const knowledge = await searchProjectKnowledge({ repoLocalPath, question, overview });
+    const knowledge = await searchProjectKnowledge({ projectId, question, overview });
     if (!knowledge.available || !knowledge.sections.length) {
       return { attempted: true, usedEvidence: false, evidenceCount: 0, findings: [], reason: knowledge.reason, capabilityMap: overview, source: "none", knowledgeCommit: knowledge.commitHash };
     }
@@ -462,11 +462,11 @@ export async function createAssistantReply(projectId: string, assistantSessionId
 
   if (decision.intent === "PROJECT_FACT") {
     if (isRepositoryAccessRequest(message)) {
-      const knowledge = await inspectProjectKnowledge(project.repoLocalPath);
+      const knowledge = await inspectProjectKnowledge(projectId);
       reply = buildKnowledgeAccessReply(knowledge);
       research = { attempted: true, usedEvidence: knowledge.available, evidenceCount: 0, findings: [], reason: knowledge.reason, capabilityMap: false, source: knowledge.available ? "project_docs" : "none", knowledgeCommit: knowledge.commitHash };
     } else {
-      research = await researchProjectDocumentation(message, project.repoLocalPath, decision.factScope === "CAPABILITIES", projectId);
+      research = await researchProjectDocumentation(message, decision.factScope === "CAPABILITIES", projectId);
       reply = buildFactReply(research);
       canEscalate = !research.usedEvidence;
     }

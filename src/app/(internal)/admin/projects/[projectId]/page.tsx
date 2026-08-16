@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SubmitButton } from "@/components/admin/submit-button";
+import { ProjectAgentTokens } from "@/components/admin/project-agent-tokens";
 import {
   Avatar,
   Chip,
@@ -33,7 +34,6 @@ import {
   publishProjectUpdateAction,
   toggleMilestoneAction,
   updateProjectAction,
-  updateProjectRepoAction,
 } from "../actions";
 
 const TABS = [
@@ -70,7 +70,7 @@ export default async function AdminProjectDetailPage({
       milestones: { orderBy: [{ doneAt: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }] },
       activityLogs: { orderBy: { createdAt: "desc" } },
       updates: { orderBy: [{ status: "asc" }, { createdAt: "desc" }] },
-      repository: true,
+      agentTokens: { select: { id: true, label: true, scopes: true, expiresAt: true, lastUsedAt: true, revokedAt: true, createdAt: true }, orderBy: { createdAt: "desc" } },
     },
   });
 
@@ -78,9 +78,8 @@ export default async function AdminProjectDetailPage({
     notFound();
   }
 
-  const knowledge = await inspectProjectKnowledge(project.repoLocalPath);
+  const knowledge = await inspectProjectKnowledge(project.id);
   const updateAction = updateProjectAction.bind(null, projectId);
-  const updateRepo = updateProjectRepoAction.bind(null, projectId);
   const addMilestone = addMilestoneAction.bind(null, projectId);
   const addActivity = addActivityLogAction.bind(null, projectId);
   const createUpdate = createProjectUpdateAction.bind(null, projectId);
@@ -455,40 +454,20 @@ export default async function AdminProjectDetailPage({
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
           <Panel>
             <SectionHeader
-              title="Repositorio vinculado"
-              description="El assistant usa esta ruta para leer la documentación del proyecto bajo demanda."
+              title="Fuente documental"
+              description="Senda no guarda ni lee el repositorio. Recibe sólo documentación curada desde la CLI."
             />
-            <form action={updateRepo} className="mt-5 space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Provider" htmlFor="repoProvider">
-                  <input id="repoProvider" name="repoProvider" defaultValue={project.repoProvider ?? "LOCAL"} />
-                </Field>
-                <Field label="Branch por defecto" htmlFor="repoDefaultBranch">
-                  <input id="repoDefaultBranch" name="repoDefaultBranch" defaultValue={project.repoDefaultBranch ?? "main"} />
-                </Field>
-              </div>
-
-              <Field
-                label="Ruta local del repo"
-                htmlFor="repoLocalPath"
-                hint="Si definís PROJECT_REPOS_ROOT, la ruta puede ser relativa a ese directorio."
-              >
-                <input
-                  id="repoLocalPath"
-                  name="repoLocalPath"
-                  defaultValue={project.repoLocalPath ?? ""}
-                  placeholder="Ej. portal-senda-demo"
-                />
-              </Field>
-
-              <SubmitButton idleLabel="Guardar configuración" pendingLabel="Guardando…" className="sd-btn sd-btn-primary" />
-            </form>
+            <ol className="mt-5 space-y-3 text-[13px] text-ink-2">
+              <li><strong className="text-ink">1.</strong> Ejecutá <code>npx @prismadevs/senda-cli init --project-id {project.id}</code> en el proyecto.</li>
+              <li><strong className="text-ink">2.</strong> Completá <code>.senda/knowledge/</code> con información apta para clientes.</li>
+              <li><strong className="text-ink">3.</strong> Creá una clave abajo y ejecutá <code>senda push knowledge --apply</code>.</li>
+            </ol>
           </Panel>
 
           <Panel>
             <SectionHeader
               title="Documentación para Senda AI"
-              description="El assistant lee exclusivamente Markdown dentro de .senda/. No inspecciona código fuente."
+              description="El assistant lee exclusivamente Markdown dentro de .senda/knowledge/. No inspecciona código fuente."
             />
 
             <dl className="mt-5 divide-y divide-line text-[13px]">
@@ -507,17 +486,22 @@ export default async function AdminProjectDetailPage({
               <div className="flex items-center justify-between gap-4 py-2.5">
                 <dt className="text-ink-3">Commit leído</dt>
                 <dd className="font-mono text-[12px]">
-                  {knowledge.commitHash?.slice(0, 12) ??
-                    project.repository?.lastSeenCommit?.slice(0, 12) ??
-                    "Sin registrar"}
+                  {knowledge.commitHash?.slice(0, 12) ?? "Sin registrar"}
                 </dd>
               </div>
             </dl>
 
             {knowledge.reason ? <p className="mt-3 text-[12.5px] text-warn">{knowledge.reason}</p> : null}
-            {project.repository?.lastError ? (
-              <p className="mt-1 text-[12.5px] text-warn">{project.repository.lastError}</p>
-            ) : null}
+          </Panel>
+
+          <Panel className="xl:col-span-2">
+            <SectionHeader
+              title="Clave de sincronización para agentes"
+              description="La CLI puede crear y actualizar tareas, hitos, estado o borradores. La clave queda vinculada a este proyecto, se muestra una sola vez y nunca permite publicar al cliente."
+            />
+            <div className="mt-5">
+              <ProjectAgentTokens projectId={project.id} initialTokens={project.agentTokens.map((token) => ({ ...token, expiresAt: token.expiresAt?.toISOString() ?? null, lastUsedAt: token.lastUsedAt?.toISOString() ?? null, revokedAt: token.revokedAt?.toISOString() ?? null, createdAt: token.createdAt.toISOString() }))} />
+            </div>
           </Panel>
         </div>
       ) : null}

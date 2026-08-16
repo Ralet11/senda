@@ -28,7 +28,7 @@ contexto del proyecto para discutir ideas — las ideas accionables se convierte
 
 ## Estado actual
 Los bloques 0 a 4 están implementados. El bloque 5 tiene un assistant funcional con
-OpenAI, historial persistente y conocimiento curado desde `.senda/**/*.md`. Las
+OpenAI, historial persistente y conocimiento curado desde `.senda/knowledge/**/*.md`. Las
 preguntas sin respuesta pueden enviarse explícitamente a Prisma. El deploy actual
 está en el commit que figura en `main`.
 
