@@ -4,9 +4,23 @@
   "description": "Inicializa, valida y sincroniza documentación operativa con Senda.",
   "license": "MIT",
   "type": "module",
-  "bin": { "senda": "./bin/senda.mjs" },
-  "files": ["bin", "templates", "README.md", "LICENSE"],
-  "engines": { "node": ">=20" },
-  "publishConfig": { "access": "public" },
-  "scripts": { "test": "node --test", "pack:check": "npm pack --dry-run" }
+  "bin": {
+    "senda": "bin/senda.mjs"
+  },
+  "files": [
+    "bin",
+    "templates",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "node --test",
+    "pack:check": "npm pack --dry-run"
+  }
 }
