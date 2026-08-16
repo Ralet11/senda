@@ -14,28 +14,81 @@ function value(formData: FormData, name: string) {
   return typeof input === "string" ? input.trim() : "";
 }
 
+function clampPriority(input: number) {
+  return Number.isInteger(input) ? Math.min(3, Math.max(1, input)) : 2;
+}
+
 export async function createDevTaskAction(formData: FormData) {
   const projectId = value(formData, "projectId");
   const title = value(formData, "title");
   const description = value(formData, "description");
+  const status = value(formData, "status") as DevTaskStatus;
   const priority = Number(value(formData, "priority") || 2);
   if (!projectId || !title || title.length > 160) return;
   await requireProjectDeveloper(projectId);
-  await prisma.devTask.create({ data: { projectId, title, description: description || null, priority: Number.isInteger(priority) ? Math.min(3, Math.max(1, priority)) : 2 } });
+  await prisma.devTask.create({
+    data: {
+      projectId,
+      title,
+      description: description || null,
+      status: STATUSES.has(status) ? status : "IDEAS",
+      priority: clampPriority(priority),
+    },
+  });
   revalidatePath("/workspace");
-  revalidatePath("/admin/workspace");
 }
 
 export async function moveDevTaskAction(formData: FormData) {
   const taskId = value(formData, "taskId");
   const status = value(formData, "status") as DevTaskStatus;
+  await moveDevTask(taskId, status);
+}
+
+/**
+ * Variante tipada del movimiento, pensada para el arrastre del tablero: el
+ * cliente ya pintó el cambio y sólo necesita persistirlo.
+ */
+export async function moveDevTask(taskId: string, status: DevTaskStatus) {
   if (!taskId || !STATUSES.has(status)) return;
   const task = await prisma.devTask.findUnique({ where: { id: taskId }, select: { projectId: true } });
   if (!task) return;
   await requireProjectDeveloper(task.projectId);
   await prisma.devTask.update({ where: { id: taskId }, data: { status } });
   revalidatePath("/workspace");
-  revalidatePath("/admin/workspace");
+}
+
+export async function updateDevTaskAction(formData: FormData) {
+  const taskId = value(formData, "taskId");
+  const title = value(formData, "title");
+  const description = value(formData, "description");
+  const status = value(formData, "status") as DevTaskStatus;
+  const priority = Number(value(formData, "priority") || 2);
+  if (!taskId || !title || title.length > 160) return;
+
+  const task = await prisma.devTask.findUnique({ where: { id: taskId }, select: { projectId: true } });
+  if (!task) return;
+  await requireProjectDeveloper(task.projectId);
+
+  await prisma.devTask.update({
+    where: { id: taskId },
+    data: {
+      title,
+      description: description || null,
+      priority: clampPriority(priority),
+      ...(STATUSES.has(status) ? { status } : {}),
+    },
+  });
+  revalidatePath("/workspace");
+}
+
+export async function deleteDevTaskAction(formData: FormData) {
+  const taskId = value(formData, "taskId");
+  if (!taskId) return;
+  const task = await prisma.devTask.findUnique({ where: { id: taskId }, select: { projectId: true } });
+  if (!task) return;
+  await requireProjectDeveloper(task.projectId);
+  await prisma.devTask.delete({ where: { id: taskId } });
+  revalidatePath("/workspace");
 }
 
 export async function createDeveloperAction(formData: FormData) {

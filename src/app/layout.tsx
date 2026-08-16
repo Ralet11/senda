@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -28,7 +27,12 @@ export default function RootLayout({
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="flex min-h-full flex-col">
+        {/*
+          Fija el tema antes del primer pintado para que no haya destello. Los
+          colores se resuelven con light-dark(), así que alcanza con marcar el
+          color-scheme del documento.
+        */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -44,7 +48,6 @@ export default function RootLayout({
             `,
           }}
         />
-        <ThemeToggle />
         {children}
       </body>
     </html>

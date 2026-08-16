@@ -13,6 +13,9 @@ import {
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AssistantMarkdown } from "@/components/ui/assistant-markdown";
+import { Chip } from "@/components/ui/primitives";
+import { IconAttachment, IconSend, IconShield, IconSparkles } from "@/components/ui/icons";
+import { cn, formatDateTime, optimisticId } from "@/lib/ui";
 
 type AssistantItem = {
   id: string;
@@ -25,32 +28,43 @@ type AssistantItem = {
   attachments?: Array<{ id: string; fileName: string; mimeType: string; sizeBytes: number; url: string }>;
 };
 
-type ProposalInfo = {
-  id: string;
-  title: string;
-  status: string;
-} | null;
+type ProposalInfo = { id: string; title: string; status: string } | null;
 
-type ProjectAssistantThreadProps = {
-  projectId: string;
-  sessionId: string;
-  initialHistory: AssistantItem[];
-};
-
-function formatTimestamp(value: string) {
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
+/**
+ * Acciones rápidas: no son navegación, son preguntas ya redactadas. Le dan a
+ * alguien que no sabe qué preguntarle a la IA una puerta de entrada concreta.
+ */
+const QUICK_PROMPTS = [
+  {
+    label: "Estado del proyecto",
+    hint: "Resumen general y avance",
+    prompt:
+      "Contame cómo viene el proyecto: en qué fase está, cuánto avanzó y qué se completó últimamente.",
+  },
+  {
+    label: "Hitos",
+    hint: "Próximos y completados",
+    prompt:
+      "Explicame cuáles son los hitos completados, cuál es el próximo y si existe algún bloqueo.",
+  },
+  {
+    label: "Pendientes del equipo",
+    hint: "Qué está en curso",
+    prompt: "¿Qué quedó pendiente y en qué está trabajando el equipo ahora mismo?",
+  },
+] as const;
 
 export function ProjectAssistantThread({
   projectId,
+  projectName,
   sessionId,
   initialHistory,
-}: ProjectAssistantThreadProps) {
+}: {
+  projectId: string;
+  projectName: string;
+  sessionId: string;
+  initialHistory: AssistantItem[];
+}) {
   const router = useRouter();
   const [history, setHistory] = useState(initialHistory);
   const [message, setMessage] = useState("");
@@ -90,11 +104,11 @@ export function ProjectAssistantThread({
     if (!files) return;
     const images = Array.from(files);
     if (images.some((file) => !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type))) {
-      setError("Solo podes adjuntar imagenes JPEG, PNG, WebP o GIF.");
+      setError("Solo podés adjuntar imágenes JPEG, PNG, WebP o GIF.");
       return;
     }
     if (images.some((file) => file.size > 4 * 1024 * 1024)) {
-      setError("Para que Senda AI las analice, cada imagen debe pesar como maximo 4 MB.");
+      setError("Para que Senda AI las analice, cada imagen debe pesar como máximo 4 MB.");
       return;
     }
     setSelectedImages((current) => [...current, ...images].slice(0, 2));
@@ -116,27 +130,31 @@ export function ProjectAssistantThread({
   }
 
   async function uploadSelectedImages() {
-    return Promise.all(selectedImages.map(async (image) => {
-      const formData = new FormData();
-      formData.set("projectId", projectId);
-      formData.set("image", image);
-      const response = await fetch("/api/chat/attachments", { method: "POST", body: formData });
-      const data = (await response.json().catch(() => null)) as { attachment?: { id: string }; error?: string } | null;
-      if (!response.ok || !data?.attachment) throw new Error(data?.error ?? "No se pudo subir una imagen.");
-      return data.attachment.id;
-    }));
+    return Promise.all(
+      selectedImages.map(async (image) => {
+        const formData = new FormData();
+        formData.set("projectId", projectId);
+        formData.set("image", image);
+        const response = await fetch("/api/chat/attachments", { method: "POST", body: formData });
+        const data = (await response.json().catch(() => null)) as
+          | { attachment?: { id: string }; error?: string }
+          | null;
+        if (!response.ok || !data?.attachment) throw new Error(data?.error ?? "No se pudo subir una imagen.");
+        return data.attachment.id;
+      }),
+    );
   }
 
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-
-    const trimmed = message.trim();
+  async function sendMessage(rawMessage: string) {
+    const trimmed = rawMessage.trim();
+    if (isSubmitting) return;
     if (!trimmed && selectedImages.length === 0) return;
     const effectiveMessage = trimmed || "Analizá la imagen adjunta.";
 
     setIsSubmitting(true);
     setError(null);
     setProposal(null);
+
     let attachmentIds: string[];
     try {
       attachmentIds = await uploadSelectedImages();
@@ -147,26 +165,22 @@ export function ProjectAssistantThread({
     }
 
     const optimisticUserMessage: AssistantItem = {
-      id: `optimistic-user-${Date.now()}`,
+      id: optimisticId("optimistic-user"),
       role: "user",
       content: effectiveMessage,
       createdAt: new Date().toISOString(),
     };
     const optimisticAssistantMessage: AssistantItem = {
-      id: `optimistic-assistant-${Date.now()}`,
+      id: optimisticId("optimistic-assistant"),
       role: "assistant",
-      content: "Pensando...",
+      content: "",
       createdAt: new Date().toISOString(),
       isPending: true,
       research: { used: false, evidenceCount: 0 },
     };
 
     setMessage("");
-    setHistory((current) => [
-      ...current,
-      optimisticUserMessage,
-      optimisticAssistantMessage,
-    ]);
+    setHistory((current) => [...current, optimisticUserMessage, optimisticAssistantMessage]);
 
     const res = await fetch("/api/assistant", {
       method: "POST",
@@ -175,34 +189,21 @@ export function ProjectAssistantThread({
     });
 
     const data = (await res.json().catch(() => null)) as
-      | {
-          error?: string;
-          userMessage?: AssistantItem;
-          reply?: AssistantItem;
-          proposal?: ProposalInfo;
-        }
+      | { error?: string; userMessage?: AssistantItem; reply?: AssistantItem; proposal?: ProposalInfo }
       | null;
 
     setIsSubmitting(false);
 
     if (!res.ok || !data?.userMessage || !data.reply) {
-      setHistory((current) =>
-        current.filter((item) => item.id !== optimisticAssistantMessage.id),
-      );
+      setHistory((current) => current.filter((item) => item.id !== optimisticAssistantMessage.id));
       setError(data?.error ?? "No se pudo consultar al assistant.");
       return;
     }
 
     setHistory((current) =>
       current.map((item) => {
-        if (item.id === optimisticUserMessage.id) {
-          return data.userMessage!;
-        }
-
-        if (item.id === optimisticAssistantMessage.id) {
-          return data.reply!;
-        }
-
+        if (item.id === optimisticUserMessage.id) return data.userMessage!;
+        if (item.id === optimisticAssistantMessage.id) return data.reply!;
         return item;
       }),
     );
@@ -212,19 +213,34 @@ export function ProjectAssistantThread({
     router.refresh();
   }
 
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    await sendMessage(message);
+  }
+
   async function prepareProposal() {
     setIsPreparingProposal(true);
     setError(null);
-    const response = await fetch("/api/proposals/draft", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId, sessionId }) });
-    const data = await response.json().catch(() => null) as { proposal?: { id: string }; error?: string } | null;
+    const response = await fetch("/api/proposals/draft", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId, sessionId }),
+    });
+    const data = (await response.json().catch(() => null)) as
+      | { proposal?: { id: string }; error?: string }
+      | null;
     setIsPreparingProposal(false);
-    if (!response.ok || !data?.proposal) { setError(data?.error ?? "No se pudo preparar la propuesta."); return; }
+    if (!response.ok || !data?.proposal) {
+      setError(data?.error ?? "No se pudo preparar la propuesta.");
+      return;
+    }
     router.push(`/projects/${projectId}/proposals/${data.proposal.id}`);
   }
 
   async function escalateQuestion(replyId: string) {
     const replyIndex = history.findIndex((item) => item.id === replyId);
-    const question = replyIndex > 0 && history[replyIndex - 1]?.role === "user" ? history[replyIndex - 1].content : null;
+    const question =
+      replyIndex > 0 && history[replyIndex - 1]?.role === "user" ? history[replyIndex - 1].content : null;
     if (!question) {
       setError("No pude recuperar la pregunta original.");
       return;
@@ -237,197 +253,289 @@ export function ProjectAssistantThread({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ projectId, sessionId, question }),
     });
-    const data = await response.json().catch(() => null) as { question?: { id: string }; error?: string } | null;
+    const data = (await response.json().catch(() => null)) as { question?: { id: string }; error?: string } | null;
     setIsEscalating(null);
     if (!response.ok || !data?.question) {
-      setError(data?.error ?? "No se pudo enviar la pregunta a Prisma.");
+      setError(data?.error ?? "No se pudo enviar la pregunta al equipo.");
       return;
     }
-    setEscalatedReplies((current) => current.includes(replyId) ? current : [...current, replyId]);
+    setEscalatedReplies((current) => (current.includes(replyId) ? current : [...current, replyId]));
   }
 
+  const empty = history.length === 0;
+
   return (
-    <main className="flex h-full min-h-0 flex-col">
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
-        <header className="border-b border-zinc-100 bg-white px-6 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                Senda AI
-              </p>
-              <p className="text-sm font-medium text-zinc-900">
-                Entendé cómo avanza y funciona tu proyecto
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-[11px]">
-              <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700">
-                {history.length} items
-              </span>
-              <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700">
-                Contexto seguro
-              </span>
-              {history.length > 0 ? <button type="button" onClick={prepareProposal} disabled={isPreparingProposal} className="rounded-full border border-teal-600/30 bg-teal-50 px-2.5 py-1 font-medium text-teal-700 disabled:opacity-50">{isPreparingProposal ? "Preparando…" : "Preparar propuesta"}</button> : null}
-            </div>
-          </div>
-        </header>
+    <main className="flex h-full min-w-0 flex-1 flex-col">
+      <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-line px-5">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <IconSparkles size={17} className="shrink-0 text-accent" />
+          <p className="truncate text-[14px] font-semibold">Senda AI</p>
+          <span className="hidden truncate text-[12.5px] text-ink-3 sm:inline">· {projectName}</span>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Chip tone="accent" className="hidden sm:inline-flex">
+            <IconShield size={13} />
+            Contexto seguro
+          </Chip>
+          {!empty ? (
+            <button
+              type="button"
+              onClick={prepareProposal}
+              disabled={isPreparingProposal}
+              className="sd-btn sd-btn-outline sd-btn-sm"
+            >
+              {isPreparingProposal ? "Preparando…" : "Preparar propuesta"}
+            </button>
+          ) : null}
+        </div>
+      </header>
 
-        <div className="flex min-h-0 flex-1 flex-col bg-white">
-          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-            {history.length === 0 ? (
-              <div className="flex h-full min-h-[260px] items-center justify-center px-6">
-                <div className="max-w-md text-center">
-                  <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--brand-soft)] text-lg font-bold text-[var(--brand-strong)]">S</span>
-                  <h2 className="mt-4 text-lg font-semibold text-zinc-900">¿Qué querés resolver hoy?</h2>
-                  <p className="mt-2 text-sm leading-6 text-zinc-500">Preguntá por el proyecto, adjuntá una referencia o activá Visual para crear una propuesta desde una idea.</p>
-                  <div className="mt-5 flex flex-wrap justify-center gap-2 text-xs text-zinc-600"><span className="rounded-full border border-[var(--border-soft)] bg-[var(--surface)] px-3 py-1.5">Explicame cómo funciona</span><span className="rounded-full border border-[var(--border-soft)] bg-[var(--surface)] px-3 py-1.5">Creá una propuesta visual</span></div>
-                </div>
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-3xl px-5 py-6">
+          {empty ? (
+            <div className="py-8">
+              <span
+                className="flex h-11 w-11 items-center justify-center rounded-[13px]"
+                style={{ background: "var(--accent-soft)", color: "var(--accent-ink)" }}
+                aria-hidden="true"
+              >
+                <IconSparkles size={20} />
+              </span>
+              <h2 className="mt-4 text-[22px] font-semibold">¿Qué querés saber de {projectName}?</h2>
+              <p className="mt-2 max-w-lg leading-relaxed text-ink-2">
+                Entiendo el estado y el funcionamiento de tu proyecto para darte respuestas claras y accionables,
+                sin exponer detalles de implementación.
+              </p>
+
+              <div className="mt-7 grid gap-2 sm:grid-cols-2">
+                {QUICK_PROMPTS.map((action) => (
+                  <button
+                    key={action.label}
+                    type="button"
+                    onClick={() => void sendMessage(action.prompt)}
+                    disabled={isSubmitting}
+                    className="rounded-panel border border-line px-4 py-3 text-left transition hover:border-line-strong hover:bg-raised disabled:opacity-50"
+                  >
+                    <span className="block text-[13.5px] font-medium">{action.label}</span>
+                    <span className="mt-0.5 block text-[12.5px] text-ink-3">{action.hint}</span>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={prepareProposal}
+                  disabled={isPreparingProposal}
+                  className="rounded-panel border border-line px-4 py-3 text-left transition hover:border-line-strong hover:bg-raised disabled:opacity-50"
+                >
+                  <span className="block text-[13.5px] font-medium">Preparar propuesta</span>
+                  <span className="mt-0.5 block text-[12.5px] text-ink-3">Borrador con alcance e hitos</span>
+                </button>
               </div>
-            ) : (
-              <div className="space-y-2">
-                {history.map((item) => {
-                  const own = item.role === "user";
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {history.map((item) => {
+                const own = item.role === "user";
 
+                if (own) {
                   return (
-                    <div
-                      key={item.id}
-                      className={`flex ${own ? "justify-end" : "justify-start"}`}
-                    >
-                      <article
-                        className={`max-w-[92%] lg:max-w-[88%] rounded-2xl border px-3 py-2.5 shadow-sm ${
-                          own
-                            ? "border-zinc-950 bg-zinc-950 text-white"
-                            : "border-sky-200 bg-sky-50 text-zinc-900"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 text-[11px]">
-                          <span
-                            className={
-                              own
-                                ? "font-semibold text-zinc-200"
-                                : "font-semibold text-sky-800"
-                            }
-                          >
-                            {own ? "Vos" : "Senda AI"}
-                          </span>
-                          <span className={own ? "text-zinc-400" : "text-zinc-500"}>
-                            {formatTimestamp(item.createdAt)}
-                          </span>
+                    <div key={item.id} className="flex justify-end">
+                      <div className="max-w-[85%]">
+                        <p className="mb-1 text-right text-[11px] text-ink-3">{formatDateTime(item.createdAt)}</p>
+                        <div className="rounded-panel rounded-tr-sm bg-raised px-3.5 py-2.5">
+                          <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed">{item.content}</p>
                         </div>
-                        {own ? (
-                          <p className="mt-1 whitespace-pre-wrap text-[13px] leading-5">{item.content}</p>
-                        ) : (
-                          <AssistantMarkdown content={item.content} />
-                        )}
                         {item.attachments?.length ? (
-                          <div className="mt-3 flex flex-wrap gap-2">
+                          <div className="mt-2 flex flex-wrap justify-end gap-2">
                             {item.attachments.map((attachment) => (
-                              <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-black/10 bg-white/80">
-                                {/* The authenticated route protects the image; the optimizer cannot forward the session cookie. */}
+                              <a
+                                key={attachment.id}
+                                href={attachment.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="block overflow-hidden rounded-control border border-line"
+                              >
+                                {/* La ruta autenticada protege la imagen; el optimizador no puede reenviar la cookie de sesión. */}
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={attachment.url} alt={attachment.fileName} className="h-40 w-48 object-cover" />
+                                <img src={attachment.url} alt={attachment.fileName} className="h-32 w-40 object-cover" />
                               </a>
                             ))}
                           </div>
                         ) : null}
-                        {!own && item.isPending ? (
-                          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-sky-700">
-                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-sky-500" />
-                            <span>Analizando el contexto del proyecto...</span>
-                          </div>
-                        ) : null}
-                        {!own && item.research?.used ? (
-                          <div className="mt-3 border-t border-sky-200 pt-2">
-                            <p className="text-[11px] text-sky-800/80">
-                              Respuesta contrastada con la implementación actual.
-                            </p>
-                          </div>
-                        ) : null}
-                        {!own && item.canEscalate ? (
-                          <div className="mt-3 border-t border-sky-200 pt-2">
-                            {escalatedReplies.includes(item.id) ? (
-                              <p className="text-[11px] font-medium text-emerald-700">Pregunta enviada a Prisma.</p>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => escalateQuestion(item.id)}
-                                disabled={isEscalating === item.id}
-                                className="rounded-lg border border-sky-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-sky-800 disabled:opacity-50"
-                              >
-                                {isEscalating === item.id ? "Enviando..." : "Enviar esta pregunta a Prisma"}
-                              </button>
-                            )}
-                          </div>
-                        ) : null}
-                      </article>
+                      </div>
                     </div>
                   );
-                })}
-              </div>
-            )}
-          </div>
+                }
 
-          <div className="border-t border-zinc-100 bg-white px-5 py-3">
-            <form onSubmit={handleSubmit} onDragOver={(event) => { event.preventDefault(); setIsDraggingImage(true); }} onDragLeave={() => setIsDraggingImage(false)} onDrop={handleImageDrop} className={`space-y-2 ${isDraggingImage ? "rounded-xl bg-[var(--brand-soft)] p-2" : ""}`}>
-              {selectedImages.length > 0 ? (
-                <div className="flex flex-wrap gap-2 rounded-t-xl border border-b-0 border-zinc-300 bg-[var(--surface)] px-3 pt-3">
-                  {imagePreviews.map((preview, index) => (
-                    <div key={`${preview.file.name}-${preview.file.lastModified}-${index}`} className="relative flex h-16 w-16 items-end overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50 text-xs text-zinc-700">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={preview.url} alt={preview.file.name} className="absolute inset-0 h-full w-full object-cover" />
-                      <span className="relative max-w-full truncate bg-white/90 px-1 py-0.5">{preview.file.name}</span>
-                      <button type="button" onClick={() => setSelectedImages((current) => current.filter((_, currentIndex) => currentIndex !== index))} className="relative ml-auto font-semibold text-zinc-700 hover:text-zinc-950" aria-label={`Quitar ${preview.file.name}`}>×</button>
+                return (
+                  <article key={item.id} className="flex gap-3">
+                    <span
+                      className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px]"
+                      style={{ background: "var(--accent-soft)", color: "var(--accent-ink)" }}
+                      aria-hidden="true"
+                    >
+                      <IconSparkles size={15} />
+                    </span>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="mb-1 text-[11px] text-ink-3">Senda AI · {formatDateTime(item.createdAt)}</p>
+
+                      {item.isPending ? (
+                        <p className="flex items-center gap-2 text-[13px] text-ink-3">
+                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
+                          Analizando el contexto del proyecto…
+                        </p>
+                      ) : (
+                        <AssistantMarkdown content={item.content} />
+                      )}
+
+                      {item.research?.used ? (
+                        <p className="mt-2 text-[11.5px] text-ink-3">
+                          Respuesta contrastada con la documentación del proyecto.
+                        </p>
+                      ) : null}
+
+                      {item.canEscalate ? (
+                        <div className="mt-3">
+                          {escalatedReplies.includes(item.id) ? (
+                            <p className="text-[12px] font-medium text-positive">Pregunta enviada al equipo.</p>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => escalateQuestion(item.id)}
+                              disabled={isEscalating === item.id}
+                              className="sd-btn sd-btn-outline sd-btn-sm"
+                            >
+                              {isEscalating === item.id ? "Enviando…" : "Enviar esta pregunta al equipo"}
+                            </button>
+                          )}
+                        </div>
+                      ) : null}
                     </div>
-                  ))}
-                </div>
-              ) : null}
-              <div className={`flex items-end gap-2 border border-zinc-300 bg-[var(--surface)] px-3 py-1.5 shadow-sm focus-within:border-zinc-400 ${selectedImages.length > 0 ? "rounded-b-xl" : "rounded-xl"}`}>
-                <div className="hidden items-center justify-between gap-3 text-[10px]">
-                  <p className="text-zinc-500">Preguntá por avances o funcionamiento.</p>
-                  <p className="rounded-full bg-[var(--brand-soft)] px-2 py-0.5 font-medium text-[var(--brand-strong)]">
-                    AI seguro
-                  </p>
-                </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
 
-                <textarea
-                  ref={textareaRef}
-                  value={message}
-                  onChange={(event) => setMessage(event.target.value)}
-                  onPaste={handleImagePaste}
-                  rows={1}
-                  required
-                  placeholder="Escribi tu pregunta..."
-                  className="min-h-[34px] max-h-28 flex-1 resize-none bg-transparent py-1.5 text-sm leading-5 text-zinc-900 outline-none placeholder:text-zinc-500"
-                />
-
-                <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple className="sr-only" onChange={(event) => selectImages(event.target.files)} />
-                <button type="button" onClick={() => imageInputRef.current?.click()} disabled={isSubmitting || selectedImages.length >= 2} className="mb-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-zinc-200 text-lg text-zinc-600 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Adjuntar imagen" title="Adjuntar imagen">+</button>
-                <button type="button" onClick={() => setGenerateVisual((enabled) => !enabled)} disabled={isSubmitting} className={`mb-0.5 inline-flex h-8 shrink-0 items-center rounded-lg border px-2 text-[11px] font-medium transition ${generateVisual ? "border-teal-600 bg-teal-50 text-teal-700" : "border-zinc-200 text-zinc-600 hover:border-zinc-400"}`} title="Generar una propuesta visual desde tu texto o una imagen de referencia">Visual</button>
-
-                <div className="hidden mt-1 flex items-center justify-end gap-3 border-t border-zinc-200 pt-1">
-                  <p className="hidden text-[10px] text-zinc-500">Contexto del proyecto cuando haga falta.</p>
+      <div className="shrink-0 border-t border-line px-5 py-3">
+        <form
+          onSubmit={handleSubmit}
+          onDragOver={(event) => {
+            event.preventDefault();
+            setIsDraggingImage(true);
+          }}
+          onDragLeave={() => setIsDraggingImage(false)}
+          onDrop={handleImageDrop}
+          className="mx-auto w-full max-w-3xl space-y-2"
+        >
+          {selectedImages.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {imagePreviews.map((preview, index) => (
+                <div
+                  key={`${preview.file.name}-${preview.file.lastModified}-${index}`}
+                  className="relative h-16 w-16 overflow-hidden rounded-control border border-line"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={preview.url} alt={preview.file.name} className="h-full w-full object-cover" />
                   <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="inline-flex h-8 items-center justify-center rounded-lg bg-zinc-950 px-3 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    type="button"
+                    onClick={() =>
+                      setSelectedImages((current) => current.filter((_, currentIndex) => currentIndex !== index))
+                    }
+                    className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-canvas/85 text-[11px] font-bold"
+                    aria-label={`Quitar ${preview.file.name}`}
                   >
-                    {isSubmitting ? "Consultando..." : "Preguntar"}
+                    ×
                   </button>
                 </div>
-                <button type="submit" disabled={isSubmitting || (!message.trim() && selectedImages.length === 0)} className="mb-0.5 inline-flex h-8 shrink-0 items-center justify-center rounded-lg bg-zinc-950 px-3 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? "..." : "Enviar"}</button>
-              </div>
-              {proposal ? (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900">
-                  <p>Propuesta en preparación: <strong>{proposal.title}</strong></p>
-                  <Link href={`/projects/${projectId}/proposals/${proposal.id}`} className="rounded-md bg-teal-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-teal-800">
-                    Ver propuesta
-                  </Link>
-                </div>
-              ) : null}
-              {error ? <p className="text-sm text-red-600">{error}</p> : null}
-            </form>
+              ))}
+            </div>
+          ) : null}
+
+          <div
+            className={cn(
+              "flex items-end gap-2 rounded-panel border bg-sunken px-2.5 py-2 transition",
+              isDraggingImage ? "border-accent bg-accent-soft" : "border-line focus-within:border-line-strong",
+            )}
+          >
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              multiple
+              className="sr-only"
+              onChange={(event) => selectImages(event.target.files)}
+            />
+            <button
+              type="button"
+              onClick={() => imageInputRef.current?.click()}
+              disabled={isSubmitting || selectedImages.length >= 2}
+              className="sd-icon-btn shrink-0"
+              aria-label="Adjuntar imagen"
+              title="Adjuntar imagen"
+            >
+              <IconAttachment size={17} />
+            </button>
+
+            <textarea
+              ref={textareaRef}
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              onPaste={handleImagePaste}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void sendMessage(message);
+                }
+              }}
+              rows={1}
+              placeholder="Escribí tu pregunta…"
+              className="min-h-[34px] flex-1 resize-none border-0 bg-transparent p-1.5 text-[13.5px] leading-relaxed outline-none focus:bg-transparent"
+            />
+
+            <button
+              type="button"
+              onClick={() => setGenerateVisual((enabled) => !enabled)}
+              disabled={isSubmitting}
+              title="Generar una propuesta visual desde tu texto o una imagen de referencia"
+              className={cn(
+                "sd-btn sd-btn-sm shrink-0",
+                generateVisual ? "sd-btn-primary" : "sd-btn-ghost",
+              )}
+            >
+              Visual
+            </button>
+
+            <button
+              type="submit"
+              disabled={isSubmitting || (!message.trim() && selectedImages.length === 0)}
+              className="sd-icon-btn shrink-0 disabled:opacity-40"
+              style={{ background: "var(--accent)", color: "var(--on-accent)" }}
+              aria-label="Enviar"
+            >
+              <IconSend size={17} />
+            </button>
           </div>
-        </div>
-      </section>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[11px] text-ink-3">Enter para enviar · Shift + Enter para nueva línea</p>
+            {error ? <p className="text-[12px] text-danger">{error}</p> : null}
+          </div>
+
+          {proposal ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-accent/30 bg-accent-soft px-3.5 py-2.5">
+              <p className="text-[13px] text-accent-ink">
+                Propuesta en preparación: <strong>{proposal.title}</strong>
+              </p>
+              <Link href={`/projects/${projectId}/proposals/${proposal.id}`} className="sd-btn sd-btn-primary sd-btn-sm">
+                Ver propuesta
+              </Link>
+            </div>
+          ) : null}
+        </form>
+      </div>
     </main>
   );
 }

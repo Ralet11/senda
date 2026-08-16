@@ -11,6 +11,9 @@ import {
   type FormEvent,
 } from "react";
 import { AssistantMarkdown } from "@/components/ui/assistant-markdown";
+import { Avatar, Chip } from "@/components/ui/primitives";
+import { IconAttachment, IconMessage, IconSend, IconSparkles } from "@/components/ui/icons";
+import { cn } from "@/lib/ui";
 
 type ChatMessage = {
   id: string;
@@ -64,15 +67,6 @@ function getAuthorRole(message: ChatMessage) {
   if (message.isFromAssistant) return "Asistente";
   if (message.author?.globalRole === "ADMIN") return "Equipo Senda";
   return "Cliente";
-}
-
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
 }
 
 function isOwnMessage(message: ChatMessage, currentUserId: string) {
@@ -148,11 +142,11 @@ export function ProjectChatThread({
     if (!files) return;
     const images = Array.from(files);
     if (images.some((file) => !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type))) {
-      setError("Solo podes adjuntar imagenes JPEG, PNG, WebP o GIF.");
+      setError("Solo podés adjuntar imágenes JPEG, PNG, WebP o GIF.");
       return;
     }
     if (images.some((file) => file.size > 8 * 1024 * 1024)) {
-      setError("Cada imagen debe pesar como maximo 8 MB.");
+      setError("Cada imagen debe pesar como máximo 8 MB.");
       return;
     }
     setSelectedImages((current) => [...current, ...images].slice(0, 4));
@@ -229,178 +223,219 @@ export function ProjectChatThread({
   }
 
   return (
-    <main className="flex h-full min-h-0 flex-col">
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
-        <header className="border-b border-zinc-100 bg-white px-6 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
-                Conversación
-              </p>
-              <p className="text-sm font-medium text-zinc-900">
-                Conversá directamente con el equipo Senda
+    <main className="flex h-full min-w-0 flex-1 flex-col">
+      <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-line px-5">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <IconMessage size={17} className="shrink-0 text-ink-3" />
+          <p className="truncate text-[14px] font-semibold">
+            {conversationId ? "Conversación privada" : "Equipo Senda"}
+          </p>
+        </div>
+        <Chip>{orderedMessages.length} mensajes</Chip>
+      </header>
+
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-3xl px-5 py-6">
+          {orderedMessages.length === 0 ? (
+            <div className="py-10">
+              <span
+                className="flex h-11 w-11 items-center justify-center rounded-[13px]"
+                style={{ background: "var(--accent-soft)", color: "var(--accent-ink)" }}
+                aria-hidden="true"
+              >
+                <IconMessage size={20} />
+              </span>
+              <h2 className="mt-4 text-[22px] font-semibold">Empezá la conversación</h2>
+              <p className="mt-2 max-w-lg leading-relaxed text-ink-2">
+                Compartí una consulta, una decisión o una actualización. El equipo Senda y los miembros del
+                proyecto la van a ver acá.
               </p>
             </div>
+          ) : (
+            <div className="space-y-6">
+              {orderedMessages.map((message) => {
+                const own = isOwnMessage(message, currentUser.id);
+                const authorName = getAuthorName(message);
+                const authorRole = getAuthorRole(message);
 
-            <div className="flex flex-wrap items-center gap-2 text-[11px]">
-              <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700">
-                {orderedMessages.length} mensajes
-              </span>
-              <span className="rounded-full bg-[var(--brand-soft)] px-2.5 py-1 font-medium text-[var(--brand-strong)]">
-                Actualizado
-              </span>
-            </div>
-          </div>
-        </header>
-
-        <div className="flex min-h-0 flex-1 flex-col bg-white">
-          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-            {orderedMessages.length === 0 ? (
-              <div className="flex h-full min-h-[260px] flex-col items-center justify-center px-6 text-center">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--brand-soft)] text-sm font-bold text-[var(--brand-strong)]">E</span>
-                <h2 className="mt-4 text-xl font-semibold text-zinc-950">Empeza la conversacion</h2>
-                <p className="mt-2 max-w-sm text-sm leading-6 text-zinc-500">Compartí una consulta, una decisión o una actualización. El equipo Senda y los miembros del proyecto la verán acá.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {orderedMessages.map((message) => {
-                  const own = isOwnMessage(message, currentUser.id);
-                  const authorName = getAuthorName(message);
-                  const authorRole = getAuthorRole(message);
-                  const avatarLabel = message.isFromAssistant
-                    ? "AI"
-                    : getInitials(authorName);
-
+                if (own) {
                   return (
-                    <div
-                      key={message.id}
-                      className={`flex items-end gap-2 ${own ? "justify-end" : "justify-start"}`}
-                    >
-                      {!own ? (
-                        <div
-                          className={`mb-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${
-                            message.isFromAssistant
-                              ? "border border-sky-200 bg-sky-50 text-sky-800"
-                              : "border border-zinc-200 bg-white text-zinc-700"
-                          }`}
-                        >
-                          {avatarLabel}
-                        </div>
-                      ) : null}
-
-                      <article
-                        className={`max-w-[92%] lg:max-w-[88%] rounded-2xl border px-3 py-2.5 shadow-sm ${
-                          own
-                            ? "border-zinc-950 bg-zinc-950 text-white"
-                            : message.isFromAssistant
-                              ? "border-sky-200 bg-sky-50 text-zinc-900"
-                              : "border-zinc-200 bg-white text-zinc-900"
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
-                          <span
-                            className={
-                              own
-                                ? "font-semibold text-zinc-100"
-                                : "font-semibold text-zinc-800"
-                            }
-                          >
-                            {authorName}
-                          </span>
-                          <span className={own ? "text-zinc-400" : "text-zinc-500"}>
-                            {authorRole}
-                          </span>
-                          <span className={own ? "text-zinc-400" : "text-zinc-500"}>
-                            {formatTimestamp(message.createdAt)}
-                          </span>
-                        </div>
+                    <div key={message.id} className="flex justify-end">
+                      <div className="max-w-[85%]">
+                        <p className="mb-1 text-right text-[11px] text-ink-3">{formatTimestamp(message.createdAt)}</p>
                         {message.body ? (
-                          message.isFromAssistant ? (
-                            <AssistantMarkdown content={message.body} />
-                          ) : (
-                            <p className="mt-1 whitespace-pre-wrap text-[13px] leading-5">{message.body}</p>
-                          )
+                          <div className="rounded-panel rounded-tr-sm bg-raised px-3.5 py-2.5">
+                            <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed">{message.body}</p>
+                          </div>
                         ) : null}
                         {message.attachments.length > 0 ? (
-                          <div className="mt-3 flex flex-wrap gap-2">
+                          <div className="mt-2 flex flex-wrap justify-end gap-2">
                             {message.attachments.map((attachment) => (
-                              <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-black/10 bg-white/80">
-                                {/* Images stay behind the authenticated attachment route; Next image optimization cannot forward the session cookie. */}
+                              <a
+                                key={attachment.id}
+                                href={attachment.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="block overflow-hidden rounded-control border border-line"
+                              >
+                                {/* La ruta autenticada protege la imagen; el optimizador no puede reenviar la cookie de sesión. */}
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={attachment.url} alt={attachment.fileName} className="h-40 w-48 object-cover" />
+                                <img src={attachment.url} alt={attachment.fileName} className="h-32 w-40 object-cover" />
                               </a>
                             ))}
                           </div>
                         ) : null}
-                      </article>
+                      </div>
+                    </div>
+                  );
+                }
 
-                      {own ? (
-                        <div className="mb-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-zinc-900 bg-zinc-900 text-[10px] font-semibold text-white">
-                          {getInitials(currentUser.name)}
+                return (
+                  <article key={message.id} className="flex gap-3">
+                    {message.isFromAssistant ? (
+                      <span
+                        className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px]"
+                        style={{ background: "var(--accent-soft)", color: "var(--accent-ink)" }}
+                        aria-hidden="true"
+                      >
+                        <IconSparkles size={15} />
+                      </span>
+                    ) : (
+                      <Avatar name={authorName} size={28} className="mt-0.5" />
+                    )}
+
+                    <div className="min-w-0 flex-1">
+                      <p className="mb-1 text-[11px] text-ink-3">
+                        <span className="font-medium text-ink-2">{authorName}</span> · {authorRole} ·{" "}
+                        {formatTimestamp(message.createdAt)}
+                      </p>
+
+                      {message.body ? (
+                        message.isFromAssistant ? (
+                          <AssistantMarkdown content={message.body} />
+                        ) : (
+                          <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed">{message.body}</p>
+                        )
+                      ) : null}
+
+                      {message.attachments.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {message.attachments.map((attachment) => (
+                            <a
+                              key={attachment.id}
+                              href={attachment.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block overflow-hidden rounded-control border border-line"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={attachment.url} alt={attachment.fileName} className="h-32 w-40 object-cover" />
+                            </a>
+                          ))}
                         </div>
                       ) : null}
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
 
-          <div className="border-t border-zinc-100 bg-white px-5 py-3">
-            <form onSubmit={handleSubmit} onDragOver={(event) => { event.preventDefault(); setIsDraggingImage(true); }} onDragLeave={() => setIsDraggingImage(false)} onDrop={handleImageDrop} className={`space-y-2 ${isDraggingImage ? "rounded-xl bg-[var(--brand-soft)] p-2" : ""}`}>
-              {selectedImages.length > 0 ? (
-                <div className="flex flex-wrap gap-2 rounded-t-xl border border-b-0 border-zinc-300 bg-[var(--surface)] px-3 pt-3">
-                  {imagePreviews.map((preview, index) => (
-                    <div key={`${preview.file.name}-${preview.file.lastModified}-${index}`} className="relative flex h-16 w-16 items-end overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50 text-xs text-zinc-700">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={preview.url} alt={preview.file.name} className="absolute inset-0 h-full w-full object-cover" />
-                      <span className="relative max-w-full truncate bg-white/90 px-1 py-0.5">{preview.file.name}</span>
-                      <button type="button" onClick={() => setSelectedImages((current) => current.filter((_, currentIndex) => currentIndex !== index))} className="relative ml-auto font-semibold text-zinc-700 hover:text-zinc-950" aria-label={`Quitar ${preview.file.name}`}>×</button>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-              <div className={`flex items-end gap-2 border border-zinc-300 bg-[var(--surface)] px-3 py-1.5 shadow-sm focus-within:border-zinc-400 ${selectedImages.length > 0 ? "rounded-b-xl" : "rounded-xl"}`}>
-                <div className="hidden items-center justify-between gap-3 text-[11px]">
-                  <p className="min-w-0 truncate font-medium text-zinc-800">{currentUser.name}</p>
-                  <div className="shrink-0 rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700">
-                    {currentUser.globalRole}
-                  </div>
-                </div>
-
-                <textarea
-                  ref={textareaRef}
-                  value={body}
-                  onChange={(event) => setBody(event.target.value)}
-                  onPaste={handleImagePaste}
-                  rows={1}
-                  placeholder="Escribi una consulta o actualizacion para el equipo..."
-                  className="min-h-[34px] max-h-28 flex-1 resize-none bg-transparent py-1.5 text-sm leading-5 text-zinc-900 outline-none placeholder:text-zinc-500"
-                />
-
-                <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple className="sr-only" onChange={(event) => selectImages(event.target.files)} />
-                <button type="button" onClick={() => imageInputRef.current?.click()} disabled={isSubmitting || selectedImages.length >= 4} className="mb-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-zinc-200 text-lg text-zinc-600 hover:border-zinc-400 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Adjuntar imagen" title="Adjuntar imagen">+</button>
-
-                <div className="hidden mt-1 flex items-center justify-end gap-3 border-t border-zinc-200 pt-1">
-                  <p className="hidden text-[11px] text-zinc-500">
-                    Visible para todos los miembros del proyecto
-                  </p>
+      <div className="shrink-0 border-t border-line px-5 py-3">
+        <form
+          onSubmit={handleSubmit}
+          onDragOver={(event) => {
+            event.preventDefault();
+            setIsDraggingImage(true);
+          }}
+          onDragLeave={() => setIsDraggingImage(false)}
+          onDrop={handleImageDrop}
+          className="mx-auto w-full max-w-3xl space-y-2"
+        >
+          {selectedImages.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {imagePreviews.map((preview, index) => (
+                <div
+                  key={`${preview.file.name}-${preview.file.lastModified}-${index}`}
+                  className="relative h-16 w-16 overflow-hidden rounded-control border border-line"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={preview.url} alt={preview.file.name} className="h-full w-full object-cover" />
                   <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="inline-flex h-8 items-center justify-center rounded-lg bg-zinc-950 px-3 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    type="button"
+                    onClick={() =>
+                      setSelectedImages((current) => current.filter((_, currentIndex) => currentIndex !== index))
+                    }
+                    className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-canvas/85 text-[11px] font-bold"
+                    aria-label={`Quitar ${preview.file.name}`}
                   >
-                    {isSubmitting ? "Enviando..." : "Enviar"}
+                    ×
                   </button>
                 </div>
-                <button type="submit" disabled={isSubmitting || (!body.trim() && selectedImages.length === 0)} className="mb-0.5 inline-flex h-8 shrink-0 items-center justify-center rounded-lg bg-zinc-950 px-3 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? "..." : "Enviar"}</button>
-              </div>
+              ))}
+            </div>
+          ) : null}
 
-              {error ? <p className="text-sm text-red-600">{error}</p> : null}
-            </form>
+          <div
+            className={cn(
+              "flex items-end gap-2 rounded-panel border bg-sunken px-2.5 py-2 transition",
+              isDraggingImage ? "border-accent bg-accent-soft" : "border-line focus-within:border-line-strong",
+            )}
+          >
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              multiple
+              className="sr-only"
+              onChange={(event) => selectImages(event.target.files)}
+            />
+            <button
+              type="button"
+              onClick={() => imageInputRef.current?.click()}
+              disabled={isSubmitting || selectedImages.length >= 4}
+              className="sd-icon-btn shrink-0"
+              aria-label="Adjuntar imagen"
+              title="Adjuntar imagen"
+            >
+              <IconAttachment size={17} />
+            </button>
+
+            <textarea
+              ref={textareaRef}
+              value={body}
+              onChange={(event) => setBody(event.target.value)}
+              onPaste={handleImagePaste}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
+              rows={1}
+              placeholder="Escribí una consulta o actualización para el equipo…"
+              className="min-h-[34px] flex-1 resize-none border-0 bg-transparent p-1.5 text-[13.5px] leading-relaxed outline-none focus:bg-transparent"
+            />
+
+            <button
+              type="submit"
+              disabled={isSubmitting || (!body.trim() && selectedImages.length === 0)}
+              className="sd-icon-btn shrink-0 disabled:opacity-40"
+              style={{ background: "var(--accent)", color: "var(--on-accent)" }}
+              aria-label="Enviar"
+            >
+              <IconSend size={17} />
+            </button>
           </div>
-        </div>
-      </section>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[11px] text-ink-3">Visible para los miembros de esta conversación</p>
+            {error ? <p className="text-[12px] text-danger">{error}</p> : null}
+          </div>
+        </form>
+      </div>
     </main>
   );
 }

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { ChatRail } from "@/components/chat/chat-rail";
 import { ProjectChatThread } from "@/components/chat/project-chat-thread";
 import { ConversationFrame } from "@/components/conversation/conversation-frame";
 import { requireProjectMember } from "@/lib/auth";
@@ -61,7 +62,7 @@ export default async function ProjectChatPage({
     : undefined;
   if (requestedConversation && !conversationId) notFound();
 
-  const [project, messages] = await Promise.all([
+  const [project, messages, conversations, members] = await Promise.all([
     prisma.project.findUnique({
       where: { id: projectId },
       select: { id: true },
@@ -84,6 +85,16 @@ export default async function ProjectChatPage({
         },
       },
     }),
+    prisma.projectConversation.findMany({
+      where: { projectId, members: { some: { userId: user.id } } },
+      include: { members: { include: { user: { select: { id: true, name: true } } } } },
+      orderBy: { updatedAt: "desc" },
+    }),
+    prisma.projectMember.findMany({
+      where: { projectId, userId: { not: user.id } },
+      include: { user: { select: { id: true, name: true } } },
+      orderBy: { user: { name: "asc" } },
+    }),
   ]);
 
   if (!project) {
@@ -91,16 +102,29 @@ export default async function ProjectChatPage({
   }
 
   return (
-    <ConversationFrame><ProjectChatThread
-      projectId={projectId}
-      conversationId={conversationId}
-      currentUser={{
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        globalRole: user.globalRole,
-      }}
-      initialMessages={messages.map(serializeMessage)}
-    /></ConversationFrame>
+    <ConversationFrame>
+      <ChatRail
+        projectId={projectId}
+        activeConversationId={conversationId}
+        conversations={conversations.map((conversation) => ({
+          id: conversation.id,
+          label:
+            conversation.members.find((member) => member.user.id !== user.id)?.user.name ??
+            "Conversación directa",
+        }))}
+        availableMembers={members.map((member) => member.user)}
+      />
+      <ProjectChatThread
+        projectId={projectId}
+        conversationId={conversationId}
+        currentUser={{
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          globalRole: user.globalRole,
+        }}
+        initialMessages={messages.map(serializeMessage)}
+      />
+    </ConversationFrame>
   );
 }

@@ -1,8 +1,13 @@
-import { ProjectShell } from "@/components/dashboard/project-shell";
+import { ClientShell } from "@/components/shell/client-shell";
 import { requireProjectMember } from "@/lib/auth";
-import { getAccessibleProjectsForUser, getProjectDashboard } from "@/lib/projects";
-import { prisma } from "@/lib/prisma";
+import { getAccessibleProjectsForUser } from "@/lib/projects";
+import { formatGlobalRole } from "@/lib/ui";
 
+/**
+ * Las conversaciones ya no viven en la barra lateral: cada sección que las
+ * necesita (chat, Senda AI) monta su propia columna. El layout sólo sostiene la
+ * navegación del proyecto.
+ */
 export default async function ProjectLayout({
   children,
   params,
@@ -12,45 +17,15 @@ export default async function ProjectLayout({
 }) {
   const { projectId } = await params;
   const user = await requireProjectMember(projectId);
-  const [projects, project, directConversations, assistantSessions, members] = await Promise.all([
-    getAccessibleProjectsForUser(user.id, user.globalRole),
-    getProjectDashboard(projectId),
-    prisma.projectConversation.findMany({
-      where: { projectId, members: { some: { userId: user.id } } },
-      include: { members: { include: { user: { select: { id: true, name: true } } } } },
-      orderBy: { updatedAt: "desc" },
-    }),
-    prisma.assistantSession.findMany({
-      where: { projectId, userId: user.id, contextChunks: { some: {} } },
-      select: { id: true, title: true },
-      orderBy: { updatedAt: "desc" },
-      take: 12,
-    }),
-    prisma.projectMember.findMany({
-      where: { projectId, userId: { not: user.id } },
-      include: { user: { select: { id: true, name: true } } },
-      orderBy: { user: { name: "asc" } },
-    }),
-  ]);
-
-  if (!project) {
-    return <>{children}</>;
-  }
+  const projects = await getAccessibleProjectsForUser(user.id, user.globalRole);
 
   return (
-    <ProjectShell
-      currentProjectId={projectId}
-      currentProjectName={project.name}
+    <ClientShell
+      projectId={projectId}
       projects={projects}
-      directConversations={directConversations.map((conversation) => ({
-        id: conversation.id,
-        label: conversation.members.find((member) => member.user.id !== user.id)?.user.name ?? "Conversación directa",
-      }))}
-      assistantSessions={assistantSessions}
-      availableMembers={members.map((member) => member.user)}
-      currentUser={{ name: user.name, email: user.email }}
+      user={{ name: user.name, email: user.email, roleLabel: formatGlobalRole(user.globalRole) }}
     >
       {children}
-    </ProjectShell>
+    </ClientShell>
   );
 }

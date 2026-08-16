@@ -51,8 +51,12 @@ function redirectWithStatus(
   path: string,
   kind: "error" | "success",
   message: string,
+  tab?: string,
 ): never {
-  redirect(`${path}?${kind}=${encodeURIComponent(message)}`);
+  const query = new URLSearchParams();
+  if (tab) query.set("tab", tab);
+  query.set(kind, message);
+  redirect(`${path}?${query.toString()}`);
 }
 
 export async function createProjectAction(formData: FormData) {
@@ -157,6 +161,13 @@ export async function createProjectAction(formData: FormData) {
   redirectWithStatus("/admin/projects", "success", "Proyecto creado.");
 }
 
+/**
+ * Datos del proyecto (pestaña General).
+ *
+ * La configuración del repo se guarda por separado: al vivir en otra pestaña,
+ * un único formulario que escribiera ambos grupos borraría los campos que no
+ * se enviaron.
+ */
 export async function updateProjectAction(projectId: string, formData: FormData) {
   await requireAdmin();
 
@@ -164,9 +175,6 @@ export async function updateProjectAction(projectId: string, formData: FormData)
   const summary = getString(formData, "summary");
   const phase = getString(formData, "phase");
   const progress = parseProgressValue(getString(formData, "progress"));
-  const repoProvider = parseOptionalRepoValue(getString(formData, "repoProvider"));
-  const repoLocalPath = parseOptionalRepoValue(getString(formData, "repoLocalPath"));
-  const repoDefaultBranch = parseOptionalRepoValue(getString(formData, "repoDefaultBranch"));
 
   if (!name) {
     redirectWithStatus(
@@ -201,15 +209,29 @@ export async function updateProjectAction(projectId: string, formData: FormData)
       phase: projectPhase,
       progress: projectProgress,
       summary: summary || null,
-      repoProvider,
-      repoLocalPath,
-      repoDefaultBranch,
     },
   });
 
   revalidatePath("/admin/projects");
   revalidatePath(`/admin/projects/${projectId}`);
   redirectWithStatus(`/admin/projects/${projectId}`, "success", "Proyecto actualizado.");
+}
+
+/** Configuración del repositorio que el assistant usa como fuente (pestaña Configuración). */
+export async function updateProjectRepoAction(projectId: string, formData: FormData) {
+  await requireAdmin();
+
+  const repoProvider = parseOptionalRepoValue(getString(formData, "repoProvider"));
+  const repoLocalPath = parseOptionalRepoValue(getString(formData, "repoLocalPath"));
+  const repoDefaultBranch = parseOptionalRepoValue(getString(formData, "repoDefaultBranch"));
+
+  await prisma.project.update({
+    where: { id: projectId },
+    data: { repoProvider, repoLocalPath, repoDefaultBranch },
+  });
+
+  revalidatePath(`/admin/projects/${projectId}`);
+  redirectWithStatus(`/admin/projects/${projectId}`, "success", "Configuración actualizada.", "config");
 }
 
 export async function addMilestoneAction(projectId: string, formData: FormData) {
@@ -224,6 +246,7 @@ export async function addMilestoneAction(projectId: string, formData: FormData) 
       `/admin/projects/${projectId}`,
       "error",
       "El milestone necesita un titulo.",
+      "hitos",
     );
   }
 
@@ -232,6 +255,7 @@ export async function addMilestoneAction(projectId: string, formData: FormData) 
       `/admin/projects/${projectId}`,
       "error",
       "La fecha del milestone no es valida.",
+      "hitos",
     );
   }
 
@@ -244,7 +268,7 @@ export async function addMilestoneAction(projectId: string, formData: FormData) 
   });
 
   revalidatePath(`/admin/projects/${projectId}`);
-  redirectWithStatus(`/admin/projects/${projectId}`, "success", "Milestone agregado.");
+  redirectWithStatus(`/admin/projects/${projectId}`, "success", "Milestone agregado.", "hitos");
 }
 
 export async function toggleMilestoneAction(projectId: string, milestoneId: string) {
@@ -260,6 +284,7 @@ export async function toggleMilestoneAction(projectId: string, milestoneId: stri
       `/admin/projects/${projectId}`,
       "error",
       "No se encontro el milestone.",
+      "hitos",
     );
   }
 
@@ -271,7 +296,7 @@ export async function toggleMilestoneAction(projectId: string, milestoneId: stri
   });
 
   revalidatePath(`/admin/projects/${projectId}`);
-  redirect(`/admin/projects/${projectId}`);
+  redirect(`/admin/projects/${projectId}?tab=hitos`);
 }
 
 export async function addActivityLogAction(projectId: string, formData: FormData) {
@@ -314,6 +339,7 @@ export async function createProjectUpdateAction(projectId: string, formData: For
       `/admin/projects/${projectId}`,
       "error",
       "El update necesita titulo y resumen.",
+      "updates",
     );
   }
 
@@ -322,6 +348,7 @@ export async function createProjectUpdateAction(projectId: string, formData: For
       `/admin/projects/${projectId}`,
       "error",
       "El tipo de update no es valido.",
+      "updates",
     );
   }
   const projectUpdateKind: ProjectUpdateKind = kind;
@@ -332,6 +359,7 @@ export async function createProjectUpdateAction(projectId: string, formData: For
       `/admin/projects/${projectId}`,
       "error",
       "La fase sugerida no es valida.",
+      "updates",
     );
   }
   const suggestedPhase: ProjectPhase | null = suggestedPhaseValue as ProjectPhase | null;
@@ -342,6 +370,7 @@ export async function createProjectUpdateAction(projectId: string, formData: For
       `/admin/projects/${projectId}`,
       "error",
       "El avance sugerido debe ser un entero entre 0 y 100.",
+      "updates",
     );
   }
 
@@ -362,7 +391,7 @@ export async function createProjectUpdateAction(projectId: string, formData: For
   );
 
   revalidatePath(`/admin/projects/${projectId}`);
-  redirectWithStatus(`/admin/projects/${projectId}`, "success", "Update creado como draft.");
+  redirectWithStatus(`/admin/projects/${projectId}`, "success", "Update creado como draft.", "updates");
 }
 
 export async function publishProjectUpdateAction(projectId: string, updateId: string) {
@@ -381,6 +410,7 @@ export async function publishProjectUpdateAction(projectId: string, updateId: st
         `/admin/projects/${projectId}`,
         "error",
         "El update no existe o ya no esta disponible para publicar.",
+        "updates",
       );
     }
 
@@ -389,7 +419,7 @@ export async function publishProjectUpdateAction(projectId: string, updateId: st
 
   revalidatePath(`/admin/projects/${projectId}`);
   revalidatePath(`/projects/${projectId}`);
-  redirectWithStatus(`/admin/projects/${projectId}`, "success", "Update publicado.");
+  redirectWithStatus(`/admin/projects/${projectId}`, "success", "Update publicado.", "updates");
 }
 
 export async function discardProjectUpdateAction(projectId: string, updateId: string) {
@@ -411,9 +441,10 @@ export async function discardProjectUpdateAction(projectId: string, updateId: st
       `/admin/projects/${projectId}`,
       "error",
       "El update no existe o ya no esta disponible para descartar.",
+      "updates",
     );
   }
 
   revalidatePath(`/admin/projects/${projectId}`);
-  redirectWithStatus(`/admin/projects/${projectId}`, "success", "Update descartado.");
+  redirectWithStatus(`/admin/projects/${projectId}`, "success", "Update descartado.", "updates");
 }
