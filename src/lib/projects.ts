@@ -1,8 +1,9 @@
 import "server-only";
+import type { GlobalRole } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 
-export async function getAccessibleProjectsForUser(userId: string, isAdmin: boolean) {
-  if (isAdmin) {
+export async function getAccessibleProjectsForUser(userId: string, globalRole: GlobalRole) {
+  if (globalRole === "ADMIN") {
     return prisma.project.findMany({
       orderBy: { updatedAt: "desc" },
       select: {

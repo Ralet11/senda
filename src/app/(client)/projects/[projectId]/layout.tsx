@@ -13,7 +13,7 @@ export default async function ProjectLayout({
   const { projectId } = await params;
   const user = await requireProjectMember(projectId);
   const [projects, project, directConversations, assistantSessions, members] = await Promise.all([
-    getAccessibleProjectsForUser(user.id, user.globalRole === "ADMIN"),
+    getAccessibleProjectsForUser(user.id, user.globalRole),
     getProjectDashboard(projectId),
     prisma.projectConversation.findMany({
       where: { projectId, members: { some: { userId: user.id } } },

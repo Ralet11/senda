@@ -12,13 +12,16 @@ datasource db {
 
 enum GlobalRole {
   ADMIN // Ramiro / equipo interno
+  DEV // equipo interno sin control global de la plataforma
   CLIENT
 }
 
 enum ProjectMemberRole {
   OWNER // contacto principal del cliente en ese proyecto
   COLLABORATOR // otro miembro del lado del cliente
-  TEAM // alguien de Senda trabajando en el proyecto
+  TEAM // legado: integrante interno con permisos de responsable
+  PROJECT_MANAGER // dev responsable del proyecto
+  DEVELOPER // dev asignado al proyecto
 }
 
 enum ProjectPhase {
@@ -59,6 +62,13 @@ enum ProjectUpdateSource {
   AGENT
 }
 
+enum DevTaskStatus {
+  IDEAS
+  IN_PROGRESS
+  APPLIED
+  DONE
+}
+
 enum ProjectConversationKind {
   DIRECT
 }
@@ -68,31 +78,16 @@ enum RepositorySourceKind {
   GIT_MIRROR
 }
 
-enum ProjectBrainStatus {
-  NOT_SYNCED
-  QUEUED
-  BUILDING
-  READY
-  FAILED
-  STALE
+enum ProjectQuestionStatus {
+  OPEN
+  ANSWERED
+  CLOSED
 }
 
-enum ProjectBrainVersionStatus {
-  PENDING
-  BUILDING
-  READY
-  FAILED
-  SUPERSEDED
-}
-
-enum ProjectBrainEvidenceKind {
-  PROJECT_DOC
-  DOMAIN_DOC
-  SCHEMA
-  API
-  SERVICE
-  UI
-  TEST
+enum AssistantAnswerStatus {
+  ANSWERED
+  INSUFFICIENT_EVIDENCE
+  ANSWERED_BY_TEAM
 }
 
 model User {
@@ -101,19 +96,22 @@ model User {
   passwordHash String
   name         String
   globalRole   GlobalRole @default(CLIENT)
+  isActive     Boolean    @default(true)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  memberships             ProjectMember[]
-  messages                Message[]
-  uploadedAttachments     ChatAttachment[]
-  conversationMemberships ProjectConversationMember[]
-  assistantSessions       AssistantSession[]
-  reviewedProposals       Proposal[]                  @relation("ProposalReviewer")
-  createdProposals        Proposal[]                  @relation("ProposalCreator")
-  proposalMessages        ProposalMessage[]
-  sessions                Session[]
-  projectUpdates          ProjectUpdate[]
+  memberships              ProjectMember[]
+  messages                 Message[]
+  uploadedAttachments      ChatAttachment[]
+  conversationMemberships  ProjectConversationMember[]
+  assistantSessions        AssistantSession[]
+  reviewedProposals        Proposal[]                  @relation("ProposalReviewer")
+  createdProposals         Proposal[]                  @relation("ProposalCreator")
+  proposalMessages         ProposalMessage[]
+  sessions                 Session[]
+  projectUpdates           ProjectUpdate[]
+  askedProjectQuestions    ProjectQuestion[]           @relation("ProjectQuestionAsker")
+  answeredProjectQuestions ProjectQuestion[]           @relation("ProjectQuestionAnswerer")
 }
 
 // Sesión persistida en DB (en vez de JWT) para poder invalidar logins con un delete.
@@ -150,119 +148,41 @@ model Project {
   contextChunks     ProjectContextChunk[]
   updates           ProjectUpdate[]
   repository        ProjectRepository?
-  brainVersions     ProjectBrainVersion[]
-  brainEvaluations  ProjectBrainEvaluation[]
+  questions         ProjectQuestion[]
+  devTasks          DevTask[]
+}
+
+model DevTask {
+  id          String        @id @default(cuid())
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String
+  title       String
+  description String?
+  status      DevTaskStatus @default(IDEAS)
+  priority    Int           @default(2)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([projectId, status, updatedAt])
 }
 
 // Fuente autorizada de lectura. Nunca contiene tokens, credenciales ni URLs privadas.
 model ProjectRepository {
-  id             String                @id @default(cuid())
-  project        Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  projectId      String                @unique
-  kind           RepositorySourceKind  @default(LOCAL_CHECKOUT)
+  id             String               @id @default(cuid())
+  project        Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId      String               @unique
+  kind           RepositorySourceKind @default(LOCAL_CHECKOUT)
   relativePath   String
   defaultBranch  String?
   lastSeenCommit String?
   lastSeenAt     DateTime?
-  worktreeDirty  Boolean               @default(false)
+  worktreeDirty  Boolean              @default(false)
   lastError      String?
-  brainStatus    ProjectBrainStatus    @default(NOT_SYNCED)
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
-  brainVersions  ProjectBrainVersion[]
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 }
 
-// Snapshot inmutable del conocimiento generado desde un commit concreto.
-model ProjectBrainVersion {
-  id            String                    @id @default(cuid())
-  project       Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  projectId     String
-  repository    ProjectRepository         @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  repositoryId  String
-  commitHash    String
-  status        ProjectBrainVersionStatus @default(PENDING)
-  filesScanned  Int                       @default(0)
-  generatedAt   DateTime?
-  failureReason String?
-  createdAt     DateTime                  @default(now())
-  domains       ProjectBrainDomain[]
-  capabilities  ProjectBrainCapability[]
-  evidence      ProjectBrainEvidence[]
-
-  @@unique([projectId, commitHash])
-  @@index([repositoryId, createdAt])
-}
-
-// Dominio funcional apto para explicar al cliente, no una copia del código.
-model ProjectBrainDomain {
-  id             String                   @id @default(cuid())
-  brainVersion   ProjectBrainVersion      @relation(fields: [brainVersionId], references: [id], onDelete: Cascade)
-  brainVersionId String
-  key            String
-  name           String
-  description    String
-  confidence     String
-  createdAt      DateTime                 @default(now())
-  capabilities   ProjectBrainCapability[]
-  evidence       ProjectBrainEvidence[]
-
-  @@unique([brainVersionId, key])
-}
-
-// Capacidad funcional concreta, derivada de un dominio y respaldada por evidencia.
-model ProjectBrainCapability {
-  id             String                 @id @default(cuid())
-  brainVersion   ProjectBrainVersion    @relation(fields: [brainVersionId], references: [id], onDelete: Cascade)
-  brainVersionId String
-  domain         ProjectBrainDomain?    @relation(fields: [domainId], references: [id], onDelete: SetNull)
-  domainId       String?
-  key            String
-  name           String
-  description    String
-  confidence     String
-  createdAt      DateTime               @default(now())
-  evidence       ProjectBrainEvidence[]
-
-  @@unique([brainVersionId, key])
-  @@index([domainId])
-}
-
-// Evidencia interna: nunca se entrega al cliente ni se usa para exponer código.
-model ProjectBrainEvidence {
-  id             String                   @id @default(cuid())
-  brainVersion   ProjectBrainVersion      @relation(fields: [brainVersionId], references: [id], onDelete: Cascade)
-  brainVersionId String
-  domain         ProjectBrainDomain?      @relation(fields: [domainId], references: [id], onDelete: Cascade)
-  domainId       String?
-  capability     ProjectBrainCapability?  @relation(fields: [capabilityId], references: [id], onDelete: Cascade)
-  capabilityId   String?
-  kind           ProjectBrainEvidenceKind
-  relativePath   String
-  lineStart      Int?
-  lineEnd        Int?
-  excerpt        String
-  fingerprint    String
-  createdAt      DateTime                 @default(now())
-
-  @@index([brainVersionId])
-  @@index([domainId])
-  @@index([capabilityId])
-}
-
-// Casos de control que el equipo puede aprobar antes de habilitar el cerebro al cliente.
-model ProjectBrainEvaluation {
-  id              String   @id @default(cuid())
-  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  projectId       String
-  title           String
-  question        String
-  expectedOutcome String
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([projectId, isActive])
-}
+// El conocimiento funcional ya no se deriva del codigo: se lee desde `.senda/**/*.md`.
 
 // Registro liviano de errores de backend, redactado, para el panel /admin/console. No reemplaza
 // los logs de PM2: es una vista rapida desde el navegador para no tener que entrar por SSH.
@@ -275,6 +195,21 @@ model ErrorLog {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+// Evidencia minima de aceptacion de terminos en la experiencia publica de Prisma.
+// No contiene mensajes, nombre, email ni direccion IP.
+model PublicIdeationConsent {
+  id                 String   @id @default(cuid())
+  anonymousSessionId String   @unique
+  acceptedAt         DateTime
+  receivedAt         DateTime @default(now())
+  acceptanceMethod   String
+  termsVersion       String
+  privacyVersion     String
+  noticeVersion      String
+
+  @@index([acceptedAt])
 }
 
 model ProjectMember {
@@ -359,6 +294,7 @@ model AssistantSession {
   updatedAt     DateTime              @updatedAt
   contextChunks ProjectContextChunk[]
   proposals     Proposal[]
+  questions     ProjectQuestion[]
 
   @@index([projectId, userId, updatedAt])
 }
@@ -408,24 +344,44 @@ model Proposal {
   updatedAt          DateTime          @updatedAt
 }
 
-// Fragmentos de contexto (brief, docs, historial) embebidos para RAG del AI assistant.
-// El embedding se agrega vía migración manual con pgvector (ver docs/ai-assistant.md).
+// Historial persistente del assistant. El conocimiento funcional vive en `.senda/**/*.md`.
 model ProjectContextChunk {
-  id                 String                       @id @default(cuid())
-  project            Project                      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id                 String                 @id @default(cuid())
+  project            Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId          String
-  assistantSession   AssistantSession?            @relation(fields: [assistantSessionId], references: [id], onDelete: Cascade)
+  assistantSession   AssistantSession?      @relation(fields: [assistantSessionId], references: [id], onDelete: Cascade)
   assistantSessionId String?
   source             String // ej: "brief", "activity_log", "chat"
   content            String
-  embedding          Unsupported("vector(1536)")?
-  embeddingModel     String?
-  embeddedAt         DateTime?
-  createdAt          DateTime                     @default(now())
+  answerStatus       AssistantAnswerStatus?
+  createdAt          DateTime               @default(now())
   attachments        ChatAttachment[]
 
   @@index([projectId])
   @@index([assistantSessionId, createdAt])
+}
+
+// Pregunta que el assistant no pudo responder con la documentacion autorizada.
+model ProjectQuestion {
+  id                 String                @id @default(cuid())
+  project            Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId          String
+  assistantSession   AssistantSession?     @relation(fields: [assistantSessionId], references: [id], onDelete: SetNull)
+  assistantSessionId String?
+  askedBy            User                  @relation("ProjectQuestionAsker", fields: [askedById], references: [id], onDelete: Cascade)
+  askedById          String
+  answeredBy         User?                 @relation("ProjectQuestionAnswerer", fields: [answeredById], references: [id], onDelete: SetNull)
+  answeredById       String?
+  question           String
+  answer             String?
+  knowledgeCommit    String?
+  status             ProjectQuestionStatus @default(OPEN)
+  answeredAt         DateTime?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  @@index([projectId, status, createdAt])
+  @@index([askedById, createdAt])
 }
 
 model ProposalMessage {

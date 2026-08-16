@@ -21,6 +21,7 @@ type AssistantItem = {
   createdAt: string;
   isPending?: boolean;
   research?: { used: boolean; evidenceCount: number };
+  canEscalate?: boolean;
   attachments?: Array<{ id: string; fileName: string; mimeType: string; sizeBytes: number; url: string }>;
 };
 
@@ -60,6 +61,8 @@ export function ProjectAssistantThread({
   const [proposal, setProposal] = useState<ProposalInfo>(null);
   const [generateVisual, setGenerateVisual] = useState(false);
   const [isPreparingProposal, setIsPreparingProposal] = useState(false);
+  const [isEscalating, setIsEscalating] = useState<string | null>(null);
+  const [escalatedReplies, setEscalatedReplies] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -219,6 +222,30 @@ export function ProjectAssistantThread({
     router.push(`/projects/${projectId}/proposals/${data.proposal.id}`);
   }
 
+  async function escalateQuestion(replyId: string) {
+    const replyIndex = history.findIndex((item) => item.id === replyId);
+    const question = replyIndex > 0 && history[replyIndex - 1]?.role === "user" ? history[replyIndex - 1].content : null;
+    if (!question) {
+      setError("No pude recuperar la pregunta original.");
+      return;
+    }
+
+    setIsEscalating(replyId);
+    setError(null);
+    const response = await fetch("/api/project-questions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId, sessionId, question }),
+    });
+    const data = await response.json().catch(() => null) as { question?: { id: string }; error?: string } | null;
+    setIsEscalating(null);
+    if (!response.ok || !data?.question) {
+      setError(data?.error ?? "No se pudo enviar la pregunta a Prisma.");
+      return;
+    }
+    setEscalatedReplies((current) => current.includes(replyId) ? current : [...current, replyId]);
+  }
+
   return (
     <main className="flex h-full min-h-0 flex-col">
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
@@ -313,6 +340,22 @@ export function ProjectAssistantThread({
                             <p className="text-[11px] text-sky-800/80">
                               Respuesta contrastada con la implementación actual.
                             </p>
+                          </div>
+                        ) : null}
+                        {!own && item.canEscalate ? (
+                          <div className="mt-3 border-t border-sky-200 pt-2">
+                            {escalatedReplies.includes(item.id) ? (
+                              <p className="text-[11px] font-medium text-emerald-700">Pregunta enviada a Prisma.</p>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => escalateQuestion(item.id)}
+                                disabled={isEscalating === item.id}
+                                className="rounded-lg border border-sky-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-sky-800 disabled:opacity-50"
+                              >
+                                {isEscalating === item.id ? "Enviando..." : "Enviar esta pregunta a Prisma"}
+                              </button>
+                            )}
                           </div>
                         ) : null}
                       </article>

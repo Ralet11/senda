@@ -10,8 +10,6 @@ import type {
 import { requireAdmin } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
-import { buildProjectBrain, prepareProjectBrainSync } from "@/lib/project-brain";
-import { reindexProjectContext } from "@/lib/project-rag";
 import {
   createProjectUpdate,
   isProjectPhase,
@@ -33,7 +31,9 @@ function getString(formData: FormData, key: string) {
 }
 
 function isProjectMemberRole(value: string): value is ProjectMemberRole {
-  return PROJECT_MEMBER_ROLES.includes(value as ProjectMemberRole);
+  return (PROJECT_MEMBER_ROLES as readonly ProjectMemberRole[]).includes(
+    value as ProjectMemberRole,
+  );
 }
 
 function parseOptionalDate(value: string) {
@@ -98,7 +98,7 @@ export async function createProjectAction(formData: FormData) {
     select: { id: true, globalRole: true },
   });
 
-  if (existingUser?.globalRole === "ADMIN") {
+  if (existingUser && existingUser.globalRole !== "CLIENT") {
     redirectWithStatus(
       "/admin/projects",
       "error",
@@ -296,82 +296,6 @@ export async function addActivityLogAction(projectId: string, formData: FormData
 
   revalidatePath(`/admin/projects/${projectId}`);
   redirectWithStatus(`/admin/projects/${projectId}`, "success", "Actividad registrada.");
-}
-
-export async function reindexProjectContextAction(projectId: string) {
-  await requireAdmin();
-
-  try {
-    const result = await reindexProjectContext(projectId);
-    revalidatePath(`/admin/projects/${projectId}`);
-    redirectWithStatus(
-      `/admin/projects/${projectId}`,
-      "success",
-      `Contexto semántico reindexado: ${result.chunksIndexed} fragmentos.`,
-    );
-  } catch (error) {
-    console.error("project context reindex failed", error);
-    redirectWithStatus(
-      `/admin/projects/${projectId}`,
-      "error",
-      "No se pudo reindexar el contexto semántico. Revisá la configuración de OpenAI y volvé a intentar.",
-    );
-  }
-}
-
-export async function prepareProjectBrainSyncAction(projectId: string) {
-  await requireAdmin();
-
-  let result: Awaited<ReturnType<typeof prepareProjectBrainSync>>;
-  try {
-    result = await prepareProjectBrainSync(projectId);
-  } catch (error) {
-    console.error("project brain onboarding failed", error);
-    redirectWithStatus(
-      `/admin/projects/${projectId}`,
-      "error",
-      "No se pudo validar la fuente del repositorio. Revisá la ruta autorizada y el estado Git.",
-    );
-  }
-
-  revalidatePath(`/admin/projects/${projectId}`);
-  if (!result.queued) {
-    redirectWithStatus(
-      `/admin/projects/${projectId}`,
-      "error",
-      "La fuente tiene cambios sin confirmar. Confirmalos o usá un mirror antes de generar un cerebro reproducible.",
-    );
-  }
-
-  redirectWithStatus(
-    `/admin/projects/${projectId}`,
-    "success",
-    `Fuente validada en ${result.inspection.commitHash?.slice(0, 8)}. El cerebro quedó preparado para su construcción.`,
-  );
-}
-
-export async function buildProjectBrainAction(projectId: string) {
-  await requireAdmin();
-
-  let result: Awaited<ReturnType<typeof buildProjectBrain>>;
-  try {
-    result = await buildProjectBrain(projectId);
-  } catch (error) {
-    console.error("project brain build failed", error);
-    revalidatePath(`/admin/projects/${projectId}`);
-    redirectWithStatus(
-      `/admin/projects/${projectId}`,
-      "error",
-      "No se pudo construir el mapa funcional. La fuente quedó sin cambios; revisá su estado e intentá nuevamente.",
-    );
-  }
-
-  revalidatePath(`/admin/projects/${projectId}`);
-  redirectWithStatus(
-    `/admin/projects/${projectId}`,
-    "success",
-    `Mapa funcional generado: ${result.domains} dominios y ${result.capabilities} capacidades sobre ${result.filesScanned} archivos revisados.`,
-  );
 }
 
 export async function createProjectUpdateAction(projectId: string, formData: FormData) {

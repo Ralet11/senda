@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findFirst({ where: { email, isActive: true } });
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     return NextResponse.json({ error: "Credenciales inválidas" }, { status: 401 });
   }
@@ -46,6 +46,8 @@ export async function POST(request: Request) {
   let redirectTo = "/login";
   if (user.globalRole === "ADMIN") {
     redirectTo = "/admin/projects";
+  } else if (user.globalRole === "DEV") {
+    redirectTo = "/workspace";
   } else {
     const membership = await prisma.projectMember.findFirst({
       where: { userId: user.id },

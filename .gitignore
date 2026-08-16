@@ -41,6 +41,10 @@ senda-ideation-dev*.log
 # Credenciales locales de prueba; nunca versionar.
 /accesos.txt
 
+# Contexto operativo de esta máquina. Puede contener rutas y estado local;
+# nunca se versiona ni debe guardar secretos.
+/.local-context/
+
 # vercel
 .vercel
 

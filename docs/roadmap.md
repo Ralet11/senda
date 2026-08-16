@@ -39,9 +39,10 @@ Scaffold de Next.js + Prisma, estructura de carpetas, schema inicial, docs.
 
 ## Bloque 5 — AI Assistant (parcial)
 - Integración con OpenAI Responses API, con historial persistente por proyecto.
-- Contexto desde datos de PostgreSQL y búsqueda léxica limitada en un repo local permitido por `PROJECT_REPOS_ROOT`.
+- Estado desde PostgreSQL y conocimiento funcional limitado a `.senda/**/*.md` dentro de un repo permitido por `PROJECT_REPOS_ROOT`.
 - Detección de pedidos accionables y creación de propuestas para la bandeja admin.
-- Pendiente: embeddings/pgvector, RAG semántico y streaming.
+- Escalamiento explícito de preguntas sin respuesta hacia la bandeja de Prisma.
+- Pendiente: notificaciones y streaming.
 
 ## Bloque 6 — Notificaciones
 - Email transaccional (Resend o SES): mensaje nuevo, propuesta nueva, cambio de fase.

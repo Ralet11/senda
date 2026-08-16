@@ -8,6 +8,8 @@ Incluye:
 - dashboard cliente
 - chat por proyecto
 - assistant con contexto del proyecto
+- conocimiento funcional versionado en `.senda/**/*.md`
+- preguntas sin respuesta derivadas al equipo de Prisma
 - panel admin
 - endpoint externo para updates desde agentes
 

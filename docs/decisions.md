@@ -7,8 +7,8 @@ Express solo resuelve la parte de backend; obligaría a mantener un frontend apa
 
 ## Base de datos: PostgreSQL
 Además de ser confiable para datos relacionales (usuarios, proyectos, membresías),
-soporta la extensión **pgvector**, necesaria para el AI assistant (embeddings +
-búsqueda semántica/RAG) sin sumar otro servicio de base de datos.
+permite conservar conversaciones, preguntas y respuestas del equipo sin sumar otro
+servicio. El conocimiento funcional se mantiene versionado como Markdown en cada repo.
 
 ## ORM: Prisma (no Sequelize)
 Tipado end-to-end con TypeScript generado desde el schema, mejor integración con el

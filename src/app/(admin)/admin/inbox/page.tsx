@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { SubmitButton } from "@/components/admin/submit-button";
 import { prisma } from "@/lib/prisma";
-import { reviewProposalAction } from "./actions";
+import { answerProjectQuestionAction, reviewProposalAction } from "./actions";
 
 function formatDate(value: Date) {
   return new Intl.DateTimeFormat("es-AR", {
@@ -25,22 +25,32 @@ function statusLabel(status: string) {
 }
 
 export default async function AdminInboxPage() {
-  const proposals = await prisma.proposal.findMany({
-    orderBy: [{ status: "asc" }, { createdAt: "desc" }],
-    include: {
-      project: {
-        select: {
-          id: true,
-          name: true,
+  const [questions, proposals] = await Promise.all([
+    prisma.projectQuestion.findMany({
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+      include: {
+        project: { select: { id: true, name: true } },
+        askedBy: { select: { name: true } },
+        answeredBy: { select: { name: true } },
+      },
+    }),
+    prisma.proposal.findMany({
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+      include: {
+        project: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        reviewedBy: {
+          select: {
+            name: true,
+          },
         },
       },
-      reviewedBy: {
-        select: {
-          name: true,
-        },
-      },
-    },
-  });
+    }),
+  ]);
 
   return (
     <main className="min-h-screen bg-zinc-50">
@@ -49,10 +59,10 @@ export default async function AdminInboxPage() {
           <div>
             <p className="text-sm font-medium text-zinc-500">Senda</p>
             <h1 className="mt-1 text-2xl font-semibold text-zinc-950">
-              Bandeja de propuestas
+              Bandeja de Prisma
             </h1>
             <p className="mt-1 text-sm text-zinc-600">
-              Pedidos accionables detectados por el assistant para revisión interna.
+              Preguntas sin respuesta y propuestas enviadas por los clientes.
             </p>
           </div>
           <Link href="/admin/console" className="text-sm font-medium text-zinc-500 hover:text-zinc-900">
@@ -60,6 +70,40 @@ export default async function AdminInboxPage() {
           </Link>
         </div>
 
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-zinc-950">Preguntas</h2>
+            <p className="text-sm text-zinc-600">Consultas que no estaban cubiertas por la documentación del proyecto.</p>
+          </div>
+          {questions.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-zinc-300 bg-white px-5 py-8 text-sm text-zinc-500">Todavía no hay preguntas enviadas.</div>
+          ) : (
+            <div className="grid gap-4">
+              {questions.map((question) => {
+                const answerAction = answerProjectQuestionAction.bind(null, question.id);
+                return (
+                  <article key={question.id} className="rounded-lg border border-zinc-200 bg-white p-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${question.status === "OPEN" ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{question.status === "OPEN" ? "Abierta" : "Respondida"}</span>
+                      <span className="text-xs text-zinc-500">{question.project.name} · {question.askedBy.name} · {formatDate(question.createdAt)}</span>
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-zinc-900">{question.question}</p>
+                    {question.answer ? <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900"><strong>Respuesta:</strong> {question.answer}</p> : null}
+                    {question.status === "OPEN" ? (
+                      <form action={answerAction} className="mt-4 space-y-2">
+                        <textarea name="answer" required maxLength={4000} rows={3} className="w-full rounded-lg border border-zinc-300 p-3 text-sm" placeholder="Respuesta confirmada para el cliente..." />
+                        <SubmitButton idleLabel="Responder al cliente" pendingLabel="Enviando..." className="inline-flex h-9 items-center justify-center rounded-md bg-zinc-950 px-3 text-sm font-medium text-white disabled:opacity-60" />
+                      </form>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-zinc-950">Propuestas</h2>
         {proposals.length === 0 ? (
           <div className="rounded-lg border border-dashed border-zinc-300 bg-white px-5 py-10 text-sm text-zinc-500">
             Todavía no hay propuestas generadas.
@@ -134,6 +178,7 @@ export default async function AdminInboxPage() {
             })}
           </div>
         )}
+        </section>
       </div>
     </main>
   );

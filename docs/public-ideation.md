@@ -43,11 +43,25 @@ Configurar `OPENAI_API_KEY` antes de iniciar Senda.
 
 ## Contrato
 
-Request:
+Request (la aceptacion legal se envia desde el primer mensaje y se persiste una sola vez):
 
 ```json
-{ "sessionId": "opcional", "message": "Quiero construir..." }
+{
+  "sessionId": "opcional",
+  "anonymousSessionId": "uuid-del-navegador",
+  "message": "Quiero construir...",
+  "legalAcceptance": {
+    "anonymousSessionId": "uuid-del-navegador",
+    "acceptedAt": "2026-08-13T03:18:42.000Z",
+    "acceptanceMethod": "first_message_submit",
+    "termsVersion": "2026-08-13",
+    "privacyVersion": "2026-08-13",
+    "noticeVersion": "prisma-session-2026-08-13"
+  }
+}
 ```
+
+El registro persistido contiene solamente el identificador anonimo, las fechas, el metodo y las versiones legales. No guarda mensajes, nombre, email ni IP. Se elimina automaticamente al superar tres anos. Durante la transicion, clientes anteriores que no envien estos campos siguen siendo aceptados.
 
 La respuesta incluye el mensaje de Prisma, fase conversacional, sugerencias opcionales, mapa acumulativo del producto, nombre elegido, presupuesto declarado por la persona, tiempo preliminar cuando existe suficiente contexto y el indicador `readyForHandoff`. El modelo no calcula ni sugiere precios.
 

@@ -13,6 +13,10 @@ export default async function Home() {
     redirect("/admin/projects");
   }
 
+  if (user.globalRole === "DEV") {
+    redirect("/workspace");
+  }
+
   const membership = await prisma.projectMember.findFirst({
     where: { userId: user.id },
     orderBy: { createdAt: "asc" },

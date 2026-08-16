@@ -12,3 +12,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - El script puede tocar exclusivamente el checkout de Senda y el proceso PM2 `senda`; no modificar Nginx, PostgreSQL, PM2 global ni otras aplicaciones del host.
 - No desplegar si el checkout remoto tiene cambios sin commitear o si faltan `.env.production`, `node_modules` o `.next`; investigar primero.
 - Tras el deploy, verificar los smoke tests del script y el estado de PM2. Si falla, conservar el directorio de backup que el script informa; no eliminarlo automaticamente.
+
+## Contexto operativo local
+
+- Si existe `.local-context/`, leer `PROJECT_CONTEXT.md`, `CURRENT_STATE.md` y `OPERATIONS.md` antes de operar.
+- Es contexto local y no versionado: actualizarlo después de cambios relevantes, sin incluir secretos, tokens, contraseñas, hashes ni contenido de archivos `.env`.

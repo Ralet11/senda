@@ -3,15 +3,13 @@ import { notFound } from "next/navigation";
 import { parseStoredList } from "@/lib/project-updates";
 import { SubmitButton } from "@/components/admin/submit-button";
 import { prisma } from "@/lib/prisma";
+import { inspectProjectKnowledge } from "@/lib/project-knowledge";
 import {
   addActivityLogAction,
   addMilestoneAction,
   createProjectUpdateAction,
   discardProjectUpdateAction,
-  buildProjectBrainAction,
   publishProjectUpdateAction,
-  prepareProjectBrainSyncAction,
-  reindexProjectContextAction,
   toggleMilestoneAction,
   updateProjectAction,
 } from "../actions";
@@ -70,24 +68,7 @@ export default async function AdminProjectDetailPage({
       updates: {
         orderBy: [{ status: "asc" }, { createdAt: "desc" }],
       },
-      repository: {
-        include: {
-          brainVersions: {
-            orderBy: { createdAt: "desc" },
-            take: 1,
-            include: {
-              domains: {
-                orderBy: { createdAt: "asc" },
-                include: { capabilities: { orderBy: { createdAt: "asc" } } },
-              },
-            },
-          },
-        },
-      },
-      brainEvaluations: {
-        where: { isActive: true },
-        select: { id: true },
-      },
+      repository: true,
     },
   });
 
@@ -95,29 +76,16 @@ export default async function AdminProjectDetailPage({
     notFound();
   }
 
+  const knowledge = await inspectProjectKnowledge(project.repoLocalPath);
+
   const updateAction = updateProjectAction.bind(null, projectId);
   const addMilestone = addMilestoneAction.bind(null, projectId);
   const addActivity = addActivityLogAction.bind(null, projectId);
-  const reindexContext = reindexProjectContextAction.bind(null, projectId);
-  const prepareBrain = prepareProjectBrainSyncAction.bind(null, projectId);
-  const buildBrain = buildProjectBrainAction.bind(null, projectId);
   const createUpdate = createProjectUpdateAction.bind(null, projectId);
   const draftUpdates = project.updates.filter((update) => update.status === "DRAFT");
   const publishedUpdates = project.updates.filter(
     (update) => update.status === "PUBLISHED",
   );
-  const latestBrainVersion = project.repository?.brainVersions[0] ?? null;
-  const sourceReady = Boolean(project.repository?.lastSeenCommit) && !project.repository?.worktreeDirty;
-  const snapshotReady = Boolean(latestBrainVersion);
-  const mapReady = latestBrainVersion?.status === "READY";
-  const evaluationReady = project.brainEvaluations.length > 0;
-  const onboardingSteps = [
-    { label: "Fuente", detail: sourceReady ? "Commit validado" : "Pendiente", complete: sourceReady },
-    { label: "Snapshot", detail: snapshotReady ? "Versión registrada" : "Pendiente", complete: snapshotReady },
-    { label: "Mapa", detail: mapReady ? "Generado" : latestBrainVersion?.status === "BUILDING" ? "Analizando" : "Pendiente", complete: mapReady },
-    { label: "Evaluación", detail: evaluationReady ? "Casos definidos" : "Pendiente", complete: evaluationReady },
-  ];
-  const completedOnboardingSteps = onboardingSteps.filter((step) => step.complete).length;
 
   return (
     <main className="min-h-screen bg-zinc-50">
@@ -660,65 +628,17 @@ export default async function AdminProjectDetailPage({
               </div>
 
               <div className="mt-4 border-t border-zinc-200 pt-4">
-                <h3 className="text-sm font-semibold text-zinc-900">Cerebro del proyecto</h3>
+                <h3 className="text-sm font-semibold text-zinc-900">Documentación para Senda</h3>
                 <p className="mt-1 text-sm text-zinc-600">
-                  Registra un commit reproducible antes de construir el mapa funcional. La fuente se lee sólo en modo lectura.
+                  El assistant lee exclusivamente archivos Markdown dentro de <code>.senda/</code>. No inspecciona código fuente.
                 </p>
-                <div className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 p-3">
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-600">Avance del onboarding</p>
-                    <span className="text-xs font-medium text-zinc-700">{completedOnboardingSteps}/4 pasos</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {onboardingSteps.map((step, index) => (
-                      <div key={step.label} className={`rounded border px-2 py-2 ${step.complete ? "border-emerald-200 bg-emerald-50" : "border-zinc-200 bg-white"}`}>
-                        <p className={`text-xs font-semibold ${step.complete ? "text-emerald-800" : "text-zinc-700"}`}>{index + 1}. {step.label}</p>
-                        <p className={`mt-0.5 text-[11px] ${step.complete ? "text-emerald-700" : "text-zinc-500"}`}>{step.detail}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
                 <div className="mt-3 space-y-1 rounded-md border border-zinc-200 px-4 py-3 text-sm text-zinc-700">
-                  <p>Estado: <span className="font-medium">{project.repository?.brainStatus ?? "NOT_SYNCED"}</span></p>
-                  <p>Último commit: <span className="font-mono">{project.repository?.lastSeenCommit?.slice(0, 12) ?? "Sin validar"}</span></p>
-                  <p>Evaluaciones activas: <span className="font-medium">{project.brainEvaluations.length}</span></p>
+                  <p>Estado: <span className={`font-medium ${knowledge.available ? "text-emerald-700" : "text-amber-700"}`}>{knowledge.available ? "Disponible" : "Pendiente"}</span></p>
+                  <p>Documentos: <span className="font-medium">{knowledge.documentsCount}</span></p>
+                  <p>Commit leído: <span className="font-mono">{knowledge.commitHash?.slice(0, 12) ?? project.repository?.lastSeenCommit?.slice(0, 12) ?? "Sin registrar"}</span></p>
+                  {knowledge.reason ? <p className="text-amber-700">{knowledge.reason}</p> : null}
                   {project.repository?.lastError ? <p className="text-amber-700">{project.repository.lastError}</p> : null}
                 </div>
-                <form action={prepareBrain} className="mt-3">
-                  <SubmitButton
-                    idleLabel="Preparar onboarding"
-                    pendingLabel="Validando fuente..."
-                    className="inline-flex h-9 items-center justify-center rounded-md bg-zinc-950 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </form>
-                {project.repository?.brainStatus === "QUEUED" ? (
-                  <form action={buildBrain} className="mt-2">
-                    <SubmitButton
-                      idleLabel="Construir mapa funcional"
-                      pendingLabel="Analizando proyecto..."
-                      className="inline-flex h-9 items-center justify-center rounded-md border border-emerald-600 bg-emerald-600 px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-                    />
-                  </form>
-                ) : null}
-                {project.repository?.brainVersions[0] ? (
-                  <p className="mt-2 text-xs text-zinc-500">
-                    Última versión: {project.repository.brainVersions[0].status} · {project.repository.brainVersions[0].commitHash.slice(0, 12)}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="mt-4 border-t border-zinc-200 pt-4">
-                <h3 className="text-sm font-semibold text-zinc-900">Contexto semántico</h3>
-                <p className="mt-1 text-sm text-zinc-600">
-                  Genera embeddings del brief, hitos, actividad, updates publicados e historial del assistant.
-                </p>
-                <form action={reindexContext} className="mt-3">
-                  <SubmitButton
-                    idleLabel="Reindexar contexto"
-                    pendingLabel="Reindexando..."
-                    className="inline-flex h-9 items-center justify-center rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </form>
               </div>
             </div>
 

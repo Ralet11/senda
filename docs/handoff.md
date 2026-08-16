@@ -28,8 +28,9 @@ contexto del proyecto para discutir ideas — las ideas accionables se convierte
 
 ## Estado actual
 Los bloques 0 a 4 están implementados. El bloque 5 tiene un assistant funcional con
-OpenAI, contexto persistente y búsqueda léxica de repos permitidos; no usa embeddings,
-pgvector ni streaming. El deploy actual está en el commit que figura en `main`.
+OpenAI, historial persistente y conocimiento curado desde `.senda/**/*.md`. Las
+preguntas sin respuesta pueden enviarse explícitamente a Prisma. El deploy actual
+está en el commit que figura en `main`.
 
 Implementado y probado end-to-end (con curl, manualmente):
 - Modelos Prisma: `User`, `Project`, `ProjectMember`, `Milestone`, `ActivityLog`,
@@ -80,6 +81,5 @@ Implementado y probado end-to-end (con curl, manualmente):
 
 ## Próximos pasos
 - Completar notificaciones, recuperación de contraseña, registro real y adjuntos.
-- Evolucionar el assistant a RAG semántico con embeddings/pgvector si el volumen de
-  contexto lo justifica.
+- Agregar evaluaciones automáticas sobre los documentos `.senda` de cada proyecto.
 - Añadir pruebas automatizadas y health checks de despliegue.

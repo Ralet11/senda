@@ -55,7 +55,7 @@ export async function getCurrentUser() {
 
   if (!session) return null;
 
-  if (session.expiresAt < new Date()) {
+  if (session.expiresAt < new Date() || !session.user.isActive) {
     await prisma.session.delete({ where: { id: session.id } });
     return null;
   }
@@ -77,6 +77,13 @@ export async function requireAdmin() {
   return user;
 }
 
+/** Miembros internos: administradores y desarrolladores. */
+export async function requireInternal() {
+  const user = await requireUser();
+  if (user.globalRole !== "ADMIN" && user.globalRole !== "DEV") notFound();
+  return user;
+}
+
 /**
  * Un ADMIN puede ver cualquier proyecto; un CLIENT solo el/los suyo(s).
  * 404 en vez de 403 para no confirmar que el projectId existe.
@@ -90,5 +97,39 @@ export async function requireProjectMember(projectId: string) {
   });
   if (!membership) notFound();
 
+  return user;
+}
+
+/**
+ * Puede modificar el trabajo de un proyecto el administrador o su responsable.
+ * TEAM se conserva como equivalente temporal de PROJECT_MANAGER para no dejar
+ * bloqueados los proyectos ya existentes.
+ */
+export async function requireProjectManager(projectId: string) {
+  const user = await requireInternal();
+  if (user.globalRole === "ADMIN") return user;
+
+  const membership = await prisma.projectMember.findUnique({
+    where: { projectId_userId: { projectId, userId: user.id } },
+    select: { role: true },
+  });
+  if (!membership || !["PROJECT_MANAGER", "TEAM"].includes(membership.role)) {
+    notFound();
+  }
+  return user;
+}
+
+/** Desarrollador asignado que puede trabajar sobre el tablero de su proyecto. */
+export async function requireProjectDeveloper(projectId: string) {
+  const user = await requireInternal();
+  if (user.globalRole === "ADMIN") return user;
+
+  const membership = await prisma.projectMember.findUnique({
+    where: { projectId_userId: { projectId, userId: user.id } },
+    select: { role: true },
+  });
+  if (!membership || !["PROJECT_MANAGER", "DEVELOPER", "TEAM"].includes(membership.role)) {
+    notFound();
+  }
   return user;
 }

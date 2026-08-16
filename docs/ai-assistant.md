@@ -1,47 +1,52 @@
-# Assistant y contexto semántico
+# Assistant y documentación de proyectos
 
-El assistant conserva el contexto operativo del proyecto y, cuando existe un índice, suma recuperación semántica con `pgvector`.
+Senda responde preguntas funcionales desde documentación explícita y apta para clientes. No inspecciona ni indexa el código fuente del proyecto.
 
-## Qué se indexa
+## Fuente autorizada
 
-- El resumen del proyecto.
-- Milestones.
-- Activity log.
-- Updates publicados para el cliente.
-- Mensajes y respuestas del assistant.
+Cada repositorio enlazado debe incluir un directorio `.senda/` con archivos Markdown:
 
-Los vectores se guardan en `ProjectContextChunk.embedding` usando `text-embedding-3-small` por defecto. Cada búsqueda está filtrada por `projectId`; nunca mezcla contexto entre proyectos.
+```text
+.senda/
+  README.md
+  faq.md
+  glossary.md
+  domains/
+    usuarios.md
+    pagos.md
+  decisions/
+    reglas-importantes.md
+```
 
-## Operación
+Hay archivos iniciales para copiar en [`docs/project-knowledge-template`](./project-knowledge-template/README.md).
 
-1. Configurar `OPENAI_API_KEY` y, opcionalmente, `OPENAI_EMBEDDING_MODEL` en `.env.production`.
-2. Publicar únicamente con `scripts/deploy.sh`; la migración habilita `pgvector` y agrega las columnas necesarias.
-3. Desde `/admin/projects/<projectId>`, usar **Reindexar contexto** tras cargar o cambiar el brief, hitos, actividad o updates existentes.
+`README.md` presenta el producto. Los documentos de `domains/` explican flujos, reglas, límites y capacidades. La documentación no debe contener secretos, código, rutas internas ni instrucciones para el modelo.
 
-Los nuevos mensajes del assistant se embeben automáticamente. Si esa llamada a OpenAI falla, el mensaje se conserva y una reindexación posterior lo recupera.
+Senda admite hasta 48 documentos de 128 KB cada uno. Divide el contenido por encabezados Markdown y selecciona como máximo ocho secciones relacionadas con la pregunta. La respuesta sólo se acepta cuando el modelo puede vincular cada afirmación con una sección recuperada.
 
-## Investigacion de implementacion
+## Preguntas sin respuesta
 
-Para preguntas sobre como funciona el producto, el assistant puede contrastar la respuesta con el repositorio local enlazado al proyecto. No indexa ni expone codigo: usa una investigacion acotada y de solo lectura.
+Cuando no hay documentación suficiente, el assistant lo indica y ofrece **Enviar esta pregunta a Prisma**. La acción es siempre explícita: Senda no envía nada automáticamente.
 
-El flujo tiene dos etapas:
+La pregunta aparece en `/admin/inbox`. Cuando el equipo responde:
 
-1. Busca archivos relevantes y sigue un conjunto pequeno de dependencias locales.
-2. Un analista interno transforma esa evidencia en hallazgos funcionales; el chat del cliente recibe solamente esos hallazgos, nunca excerpts, rutas, codigo ni detalles de infraestructura.
+1. `ProjectQuestion` queda en estado `ANSWERED`.
+2. La respuesta se agrega a la conversación original.
+3. El equipo puede usar esa consulta como señal para actualizar la documentación del proyecto.
 
-La lectura esta limitada a 250 archivos candidatos, 8 piezas de evidencia y archivos de hasta 256 KB. Excluye directorios generados, dependencias, Git, archivos `.env`, claves, certificados, credenciales y respaldos. Las respuestas tecnicas deben indicar limites cuando no haya evidencia suficiente; el assistant no debe prometer una verificacion que no realizo.
+## Estado operativo
 
-Para habilitarlo en un entorno, `PROJECT_REPOS_ROOT` debe apuntar a un directorio que Senda controla en exclusiva — nunca al checkout en vivo de otra aplicacion ni a un directorio padre que contenga otras apps. `Project.repoLocalPath` siempre se resuelve dentro de ese directorio; una ruta que resuelva a la raiz misma o intente salir de ella se rechaza.
+Las preguntas sobre fase, avance, hitos y actividad se responden directamente desde PostgreSQL. Esa información cambia con frecuencia y no se duplica dentro de `.senda/`.
 
-## Clones propios (`repoUrl` + `scripts/sync-repo-clones.ts`)
+## Repositorios
 
-Senda nunca lee el checkout con el que corre la aplicacion del cliente: mantiene su propio clone de solo lectura, separado de donde esa app efectivamente corre. Esto desacopla la investigacion del assistant de la infraestructura del cliente (incluida una futura migracion a un EC2 dedicado) y es la unica fuente que `PROJECT_REPOS_ROOT` debe contener.
+`PROJECT_REPOS_ROOT` debe apuntar a un directorio controlado exclusivamente por Senda. `Project.repoLocalPath` siempre se resuelve como descendiente estricto de esa raíz.
 
-1. Cargar `Project.repoUrl` con el remoto SSH del repo (ej. `git@github.com:org/repo.git`). Mientras este seteado, `Project.repoLocalPath` queda autogestionado por el script (siempre `Project.id`).
-2. Generar una deploy key de solo lectura por proyecto en GitHub y guardar la clave privada en `SENDA_REPO_KEYS_DIR/<projectId>` (permisos `600`). Ese directorio debe vivir fuera de `PROJECT_REPOS_ROOT`: la investigacion del assistant nunca debe poder alcanzar una clave privada.
-3. Correr `npm run repos:sync` (clona si no existe, si no `fetch` + `reset --hard` al branch configurado). Registra el resultado en `ProjectRepository` (`kind: GIT_MIRROR`, `lastSeenCommit`, `lastSeenAt`, `lastError`).
-4. Programarlo semanalmente (cron/systemd timer en el EC2) invocando `npm run repos:sync` desde el checkout de Senda con `.env.production` cargado.
+Para mirrors propios:
 
-## Alcance inicial
+1. Configurar `Project.repoUrl` con el remoto SSH.
+2. Guardar una deploy key de sólo lectura en `SENDA_REPO_KEYS_DIR/<projectId>`.
+3. Ejecutar `npm run repos:sync` para clonar o actualizar el mirror.
+4. Programar la sincronización periódica en el EC2.
 
-El indice semantico es manual y cubre datos de Senda en PostgreSQL. La investigacion del repositorio es un complemento de solo lectura para preguntas tecnicas: no crea un indice de codigo ni permite acceder a repositorios externos fuera de la raiz configurada.
+Las claves viven fuera de `PROJECT_REPOS_ROOT`. La lectura del assistant queda limitada a `.senda/**/*.md`.

@@ -67,6 +67,12 @@ export default async function AdminProjectsPage({
             </p>
           </div>
           <div className="flex items-center gap-4">
+            <Link href="/workspace" className="text-sm font-medium text-zinc-500 hover:text-zinc-900">
+              Workspace dev
+            </Link>
+            <Link href="/admin/users" className="text-sm font-medium text-zinc-500 hover:text-zinc-900">
+              Usuarios
+            </Link>
             <Link href="/admin/console" className="text-sm font-medium text-zinc-500 hover:text-zinc-900">
               Consola de errores
             </Link>
