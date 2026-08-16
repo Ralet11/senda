@@ -27,7 +27,7 @@ export function Menu({
   label?: string;
   align?: "start" | "end";
   trigger?: React.ReactNode;
-  children: (close: () => void) => React.ReactNode;
+  children: React.ReactNode;
 }) {
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -96,6 +96,7 @@ export function Menu({
               id={menuId}
               ref={menuRef}
               role="menu"
+              onClick={close}
               className="sd-pop sd-enter fixed z-50 min-w-52 p-1.5"
               style={
                 align === "end"
@@ -103,7 +104,7 @@ export function Menu({
                   : { top: anchor.top, left: anchor.left }
               }
             >
-              {children(close)}
+              {children}
             </div>,
             document.body,
           )

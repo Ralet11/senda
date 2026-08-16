@@ -185,20 +185,18 @@ export default async function AdminProjectsPage({
                           Administrar
                         </Link>
                         <Menu label={`Acciones de ${project.name}`}>
-                          {(close) => (
-                            <>
-                              <MenuLink href={`/projects/${project.id}`} onSelect={close}>
-                                Ver portal del cliente
-                              </MenuLink>
-                              <MenuLink href={`/projects/${project.id}/assistant`} onSelect={close}>
-                                Abrir en Senda AI
-                              </MenuLink>
-                              <MenuSeparator />
-                              <MenuLink href={`/workspace?project=${project.id}`} onSelect={close}>
-                                Abrir en el workspace
-                              </MenuLink>
-                            </>
-                          )}
+                          <>
+                            <MenuLink href={`/projects/${project.id}`}>
+                              Ver portal del cliente
+                            </MenuLink>
+                            <MenuLink href={`/projects/${project.id}/assistant`}>
+                              Abrir en Senda AI
+                            </MenuLink>
+                            <MenuSeparator />
+                            <MenuLink href={`/workspace?project=${project.id}`}>
+                              Abrir en el workspace
+                            </MenuLink>
+                          </>
                         </Menu>
                       </div>
                     </li>

@@ -32,26 +32,17 @@ export function UserRowActions({ user }: { user: ManagedUser }) {
   return (
     <>
       <Menu label={`Acciones de ${user.name}`}>
-        {(close) => (
-          <>
-            <MenuItem
-              onSelect={() => {
-                setOpen(true);
-                close();
-              }}
-            >
-              Editar acceso
+        <>
+          <MenuItem onSelect={() => setOpen(true)}>Editar acceso</MenuItem>
+          <MenuSeparator />
+          <form action={toggleUserActiveAction}>
+            <input type="hidden" name="userId" value={user.id} />
+            <input type="hidden" name="active" value={String(!user.isActive)} />
+            <MenuItem type="submit" tone={user.isActive ? "danger" : "neutral"}>
+              {user.isActive ? "Desactivar usuario" : "Reactivar usuario"}
             </MenuItem>
-            <MenuSeparator />
-            <form action={toggleUserActiveAction}>
-              <input type="hidden" name="userId" value={user.id} />
-              <input type="hidden" name="active" value={String(!user.isActive)} />
-              <MenuItem type="submit" tone={user.isActive ? "danger" : "neutral"}>
-                {user.isActive ? "Desactivar usuario" : "Reactivar usuario"}
-              </MenuItem>
-            </form>
-          </>
-        )}
+          </form>
+        </>
       </Menu>
 
       <Drawer
