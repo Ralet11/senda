@@ -155,6 +155,50 @@ export function Stat({
 }
 
 /**
+ * Banda de métricas de cabecera.
+ *
+ * Es un solo panel dividido por hairlines, no cuatro cajas flotando: las cifras
+ * de una misma pantalla pertenecen al mismo objeto y deben leerse juntas.
+ */
+export function StatBand({
+  items,
+}: {
+  items: Array<{ label: string; value: React.ReactNode; hint?: string; icon: React.ReactNode; tone?: Tone }>;
+}) {
+  return (
+    <div className="sd-panel grid grid-cols-1 overflow-hidden sm:grid-cols-2 xl:grid-cols-4">
+      {items.map((item, index) => (
+        <div
+          key={item.label}
+          className={cn(
+            "flex items-center gap-3.5 px-5 py-4",
+            index > 0 && "border-t border-line sm:border-t-0",
+            index % 2 === 1 && "sm:border-l sm:border-line",
+            index >= 2 && "sm:border-t sm:border-line xl:border-t-0",
+            index > 0 && "xl:border-l xl:border-line",
+          )}
+        >
+          <span
+            className={cn(
+              "flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px]",
+              TONE_CLASS[item.tone ?? "accent"],
+            )}
+            aria-hidden="true"
+          >
+            {item.icon}
+          </span>
+          <div className="min-w-0">
+            <p className="sd-numeric text-[20px] font-semibold leading-none">{item.value}</p>
+            <p className="mt-1.5 truncate text-[12.5px] text-ink-3">{item.label}</p>
+            {item.hint ? <p className="truncate text-[11.5px] text-ink-3">{item.hint}</p> : null}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
  * Dato cualitativo: lo que se lee es el texto, no una cifra. Es el par de
  * `Stat` para hechos como "próximo hito" o "contacto del cliente".
  */

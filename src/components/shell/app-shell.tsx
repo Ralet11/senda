@@ -128,7 +128,7 @@ export function AppShell({ brandHref, groups, user, switcher, flush = false, chi
             <span aria-hidden="true">☰</span>
           </button>
           <BrandMark />
-          <span className="text-[14px] font-semibold tracking-tight">Senda</span>
+          <span className="text-[13px] font-bold uppercase tracking-[0.14em]">Senda</span>
         </div>
 
         <main className={cn("min-h-0 flex-1", flush ? "overflow-hidden" : "overflow-y-auto")}>
@@ -182,7 +182,9 @@ function SidebarContent({
       <div className={cn("flex h-14 shrink-0 items-center gap-2.5 border-b border-line", collapsed ? "justify-center px-2" : "px-4")}>
         <Link href={brandHref} className="flex min-w-0 items-center gap-2.5">
           <BrandMark />
-          {!collapsed ? <span className="truncate text-[15px] font-semibold tracking-tight">Senda</span> : null}
+          {!collapsed ? (
+            <span className="truncate text-[14px] font-bold uppercase tracking-[0.14em]">Senda</span>
+          ) : null}
         </Link>
         {!collapsed ? (
           <button
@@ -217,8 +219,10 @@ function SidebarContent({
             <ul className="space-y-0.5">
               {group.items.map((item) => {
                 const Icon = NAV_ICONS[item.icon];
-                const active =
-                  item.match === "prefix" ? pathname.startsWith(item.href) : pathname === item.href;
+                // Un ítem puede llevar contexto en el query (?project=…); lo que
+                // define si está activo es únicamente la ruta.
+                const target = item.href.split("?")[0];
+                const active = item.match === "prefix" ? pathname.startsWith(target) : pathname === target;
 
                 return (
                   <li key={item.href}>
