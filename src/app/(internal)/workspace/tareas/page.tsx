@@ -52,6 +52,7 @@ export default async function WorkspaceTasksPage({
     status: task.status as TaskStatus,
     priority: task.priority,
     updatedAt: task.updatedAt.toISOString(),
+    externalRef: task.externalRef,
   }));
 
   const byStatus = (status: TaskStatus) => tasks.filter((task) => task.status === status).length;

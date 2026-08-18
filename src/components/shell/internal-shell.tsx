@@ -44,6 +44,9 @@ export function InternalShell({
             ] as const)
           : []),
         { href: `/workspace/tareas${projectQuery}`, label: "Tareas", icon: "tasks" },
+        ...(active
+          ? ([{ href: `/workspace/conocimiento${projectQuery}`, label: "Conocimiento", icon: "document" }] as const)
+          : []),
       ],
     },
     {

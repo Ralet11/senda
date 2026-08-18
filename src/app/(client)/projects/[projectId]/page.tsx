@@ -88,6 +88,26 @@ export default async function ProjectDashboardPage({
         </div>
       </Panel>
 
+      <Panel padded={false} className="overflow-hidden">
+        <div className="grid gap-5 px-6 py-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:px-8">
+          <div className="min-w-0">
+            <p className="sd-label">Ahora</p>
+            <h2 className="mt-1.5 text-[18px] font-semibold">
+              {nextMilestone ? nextMilestone.title : "El equipo está preparando el próximo paso"}
+            </h2>
+            <p className="mt-1.5 max-w-2xl text-[13.5px] leading-relaxed text-ink-2">
+              {nextMilestone?.dueDate
+                ? `Próximo compromiso estimado para ${formatDate(nextMilestone.dueDate)}. Podés consultar cualquier detalle al equipo o a Senda AI.`
+                : "No hay un hito pendiente cargado. Si necesitás una actualización, escribile al equipo y te responden desde el proyecto."}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href={`/projects/${project.id}/chat`} className="sd-btn sd-btn-outline">Consultar al equipo</Link>
+            <Link href={`/projects/${project.id}/assistant`} className="sd-btn sd-btn-primary">Preguntar a Senda AI</Link>
+          </div>
+        </div>
+      </Panel>
+
       {/* Las cuatro preguntas del cliente: qué viene, quién trabaja, qué pasó. */}
       <div className="grid gap-6 xl:grid-cols-3">
         <Panel>

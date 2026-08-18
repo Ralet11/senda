@@ -36,6 +36,7 @@ export async function createDevTaskAction(formData: FormData) {
     },
   });
   revalidatePath("/workspace");
+  revalidatePath("/workspace/tareas");
 }
 
 export async function moveDevTaskAction(formData: FormData) {
@@ -55,6 +56,7 @@ export async function moveDevTask(taskId: string, status: DevTaskStatus) {
   await requireProjectDeveloper(task.projectId);
   await prisma.devTask.update({ where: { id: taskId }, data: { status } });
   revalidatePath("/workspace");
+  revalidatePath("/workspace/tareas");
 }
 
 export async function updateDevTaskAction(formData: FormData) {
@@ -79,6 +81,7 @@ export async function updateDevTaskAction(formData: FormData) {
     },
   });
   revalidatePath("/workspace");
+  revalidatePath("/workspace/tareas");
 }
 
 export async function deleteDevTaskAction(formData: FormData) {
@@ -89,6 +92,7 @@ export async function deleteDevTaskAction(formData: FormData) {
   await requireProjectDeveloper(task.projectId);
   await prisma.devTask.delete({ where: { id: taskId } });
   revalidatePath("/workspace");
+  revalidatePath("/workspace/tareas");
 }
 
 export async function createDeveloperAction(formData: FormData) {

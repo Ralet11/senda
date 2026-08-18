@@ -12,6 +12,8 @@ export async function POST(request: Request) {
     const outcome = await applyAgentSync(token, parsed, idempotencyKey);
     revalidatePath(`/admin/projects/${token.projectId}`);
     revalidatePath(`/workspace`);
+    revalidatePath(`/workspace/tareas`);
+    revalidatePath(`/workspace/conocimiento`);
     revalidatePath(`/projects/${token.projectId}`);
     return NextResponse.json(outcome.result, { status: outcome.replayed ? 200 : 201 });
   } catch (error) {

@@ -19,6 +19,8 @@ export type BoardTask = {
   status: TaskStatus;
   priority: number;
   updatedAt: string;
+  /** Referencia estable cuando la tarea fue sincronizada desde .senda/tasks.json. */
+  externalRef?: string | null;
 };
 
 const PRIORITY_TONE: Record<number, "danger" | "warn" | "neutral"> = {
@@ -155,6 +157,11 @@ export function TaskBoard({ projectId, tasks }: { projectId: string; tasks: Boar
                       <Chip tone={PRIORITY_TONE[task.priority] ?? "neutral"} className="text-[10.5px]">
                         {PRIORITY_LABELS[task.priority] ?? "Media"}
                       </Chip>
+                      {task.externalRef ? (
+                        <Chip tone="info" className="text-[10.5px]">
+                          CLI
+                        </Chip>
+                      ) : null}
                       <span className="ml-auto text-[11px] text-ink-3">{formatRelativeDay(task.updatedAt)}</span>
                     </div>
                   </article>
