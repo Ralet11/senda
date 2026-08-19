@@ -338,7 +338,7 @@ export function TaskBoard({
                 <p className="mt-4 text-[12.5px] text-ink-3">Todavía no hay notas. Dejá contexto para que otro dev pueda continuar.</p>
               )}
 
-              <form action={addDevTaskNoteAction} onSubmit={(event) => event.currentTarget.reset()} className="mt-4 space-y-2">
+              <form key={`${selected.id}:${selected.notes.length}`} action={addDevTaskNoteAction} className="mt-4 space-y-2">
                 <input type="hidden" name="taskId" value={selected.id} />
                 <textarea
                   name="content"
