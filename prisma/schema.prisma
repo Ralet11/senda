@@ -123,6 +123,7 @@ model User {
   answeredProjectQuestions ProjectQuestion[]           @relation("ProjectQuestionAnswerer")
   assignedDevTasks         DevTask[]                   @relation("DevTaskAssignee")
   devTaskNotes             DevTaskNote[]
+  developerCliTokens       DeveloperCliToken[]
 }
 
 // Sesión persistida en DB (en vez de JWT) para poder invalidar logins con un delete.
@@ -133,6 +134,21 @@ model Session {
   userId    String
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+
+// Clave personal, revocable y separada de los tokens del agente de repositorio.
+// Autoriza exclusivamente el trabajo de un desarrollador desde Senda CLI.
+model DeveloperCliToken {
+  id         String    @id @default(cuid())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  label      String
+  tokenHash  String    @unique
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, revokedAt])
 }
 
 model Project {

@@ -9,7 +9,7 @@ const CLI_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const TEMPLATE_ROOT = path.join(CLI_ROOT, "templates");
 const VALID_STATUSES = new Set(["IDEAS", "IN_PROGRESS", "APPLIED", "DONE"]);
 const VALID_PHASES = new Set(["DISCOVERY", "DESIGN", "DEVELOPMENT", "QA", "LAUNCHED"]);
-const SECRET_PATTERN = /(-----BEGIN [^-]+-----|\b(?:sk|rk|pk)_[A-Za-z0-9_-]{16,}|\b(?:postgres(?:ql)?:\/\/|mysql:\/\/|mongodb(?:\+srv)?:\/\/)|senda_pt_[A-Za-z0-9_-]{20,})/i;
+const SECRET_PATTERN = /(-----BEGIN [^-]+-----|\b(?:sk|rk|pk)_[A-Za-z0-9_-]{16,}|\b(?:postgres(?:ql)?:\/\/|mysql:\/\/|mongodb(?:\+srv)?:\/\/)|senda_(?:pt|dt)_[A-Za-z0-9_-]{20,})/i;
 
 export function parseArgs(argv) {
   const positionals = [];
@@ -20,7 +20,7 @@ export function parseArgs(argv) {
     const [key, inline] = value.slice(2).split("=", 2);
     flags.set(key, inline ?? (argv[index + 1] && !argv[index + 1].startsWith("--") ? argv[++index] : true));
   }
-  return { command: positionals[0], target: positionals[1], flags };
+  return { command: positionals[0], target: positionals[1], args: positionals.slice(2), flags };
 }
 
 function fail(message) { throw new Error(message); }
@@ -30,6 +30,83 @@ async function json(file) { try { return JSON.parse(await readFile(file, "utf8")
 function projectDir(root) { return path.join(root, ".senda"); }
 function assertText(value, label, max = 4000) { if (typeof value !== "string" || !value.trim() || value.trim().length > max) fail(`${label} debe ser texto no vacío de hasta ${max} caracteres.`); return value.trim(); }
 function assertId(value, label) { const id = assertText(value, label, 120); if (!/^[A-Za-z0-9._:-]+$/.test(id)) fail(`${label} sólo puede usar letras, números, punto, guion, guion bajo y dos puntos.`); return id; }
+
+async function loadConfig(root) {
+  const configFile = path.join(projectDir(root), "senda.config.json");
+  if (!await exists(configFile)) fail("Falta .senda/senda.config.json. Ejecuta senda init primero.");
+  const config = await json(configFile);
+  if (config.version !== 1) fail("senda.config.json requiere version: 1.");
+  const projectId = assertText(config.projectId, "projectId", 128);
+  const baseUrl = new URL(assertText(config.baseUrl, "baseUrl", 300));
+  if (baseUrl.protocol !== "https:" && baseUrl.hostname !== "localhost") fail("baseUrl debe usar HTTPS, excepto localhost.");
+  return { projectId, baseUrl: baseUrl.toString().replace(/\/$/, "") };
+}
+
+function developerToken() {
+  const token = process.env.SENDA_DEV_TOKEN?.trim();
+  if (!token) fail("Falta SENDA_DEV_TOKEN. Crea una clave personal en Senda > Senda CLI; nunca uses SENDA_TOKEN para tareas personales.");
+  return token;
+}
+
+async function developerRequest(config, pathName, options = {}) {
+  const response = await fetch(`${config.baseUrl}/api/external/v1/developer-tasks${pathName}`, {
+    ...options,
+    headers: { authorization: `Bearer ${developerToken()}`, ...(options.body ? { "content-type": "application/json" } : {}), ...(options.headers ?? {}) },
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    const hint = data?.error === "TASK_NOT_AVAILABLE" ? "La tarea ya no esta libre; ejecuta senda tasks available para refrescar la lista." : data?.error === "TASK_NOT_ASSIGNED_TO_YOU" ? "No podes cambiar el estado de una tarea que no te pertenece." : null;
+    fail(hint ?? data?.error ?? `Senda respondio HTTP ${response.status}.`);
+  }
+  return data;
+}
+
+function showTasks(result, asJson) {
+  if (asJson) { console.log(JSON.stringify(result, null, 2)); return; }
+  if (!result.tasks?.length) { console.log(result.view === "available" ? "No hay ideas libres en este proyecto." : "No tenes tareas asignadas en este proyecto."); return; }
+  console.log(result.view === "available" ? "Ideas libres:" : "Tus tareas:");
+  for (const task of result.tasks) {
+    const urgency = task.urgency === "URGENT" ? " [URGENTE]" : task.urgency === "HIGH" ? " [ATENCION]" : "";
+    console.log(`- ${task.title}${urgency}`);
+    console.log(`  id: ${task.id} | ${task.status} | prioridad ${task.priority} | ${task.notes.length} nota(s)`);
+    if (task.description) console.log(`  ${task.description}`);
+  }
+}
+
+async function tasks(root, target, args, flags) {
+  if (!target || flags.get("help")) {
+    console.log("Uso: senda tasks mine|available [--json] | senda tasks claim <task-id> | senda tasks status <task-id> <IDEAS|IN_PROGRESS|APPLIED|DONE> | senda tasks note <task-id> <texto>");
+    return;
+  }
+  const config = await loadConfig(root);
+  if (target === "mine" || target === "available") {
+    const result = await developerRequest(config, `?projectId=${encodeURIComponent(config.projectId)}&view=${target}`);
+    showTasks(result, Boolean(flags.get("json")));
+    return;
+  }
+  const taskId = args[0];
+  if (!taskId) fail("Indica el id de la tarea.");
+  if (target === "claim") {
+    const result = await developerRequest(config, "", { method: "POST", body: JSON.stringify({ projectId: config.projectId, action: "claim", taskId }) });
+    console.log(`Tarea reclamada: ${result.task?.title ?? taskId}. Quedo En aplicacion y asignada a vos.`);
+    return;
+  }
+  if (target === "status") {
+    const status = args[1];
+    if (!VALID_STATUSES.has(status)) fail("Estado invalido. Usa IDEAS, IN_PROGRESS, APPLIED o DONE.");
+    await developerRequest(config, "", { method: "POST", body: JSON.stringify({ projectId: config.projectId, action: "status", taskId, status }) });
+    console.log(`Estado actualizado a ${status}.`);
+    return;
+  }
+  if (target === "note") {
+    const content = args.slice(1).join(" ").trim();
+    if (!content) fail("Escribi la nota despues del id de la tarea.");
+    await developerRequest(config, "", { method: "POST", body: JSON.stringify({ projectId: config.projectId, action: "note", taskId, content }) });
+    console.log("Nota agregada.");
+    return;
+  }
+  fail("Usa: senda tasks mine|available|claim|status|note");
+}
 
 async function markdownFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -116,11 +193,12 @@ async function push(root, target, flags) {
 }
 
 export async function run(argv = process.argv.slice(2)) {
-  const { command, target, flags } = parseArgs(argv); const root = rootFrom(flags);
-  if (!command || flags.get("help")) { console.log("Uso: senda init [--project-id ID] | senda validate | senda push knowledge|tasks|milestones|project-state|all [--apply]"); return; }
+  const { command, target, args, flags } = parseArgs(argv); const root = rootFrom(flags);
+  if (!command) { console.log("Uso: senda init [--project-id ID] | senda validate | senda push knowledge|tasks|milestones|project-state|all [--apply] | senda tasks mine|available|claim|status|note"); return; }
   if (command === "init") return init(root, flags);
   if (command === "validate") { const errors = await validateRoot(root); if (errors.length) fail(`Validación fallida:\n- ${errors.join("\n- ")}`); console.log("Validación correcta: .senda está lista."); return; }
   if (command === "push") return push(root, target, flags);
+  if (command === "tasks") return tasks(root, target, args, flags);
   fail(`Comando desconocido: ${command}`);
 }
 

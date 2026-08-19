@@ -6,8 +6,9 @@ import test from "node:test";
 import { parseArgs, validateRoot } from "../bin/senda.mjs";
 
 test("parses flags before or after positional arguments", () => {
-  assert.deepEqual(parseArgs(["init", "--project-id", "project-1"]), { command: "init", target: undefined, flags: new Map([["project-id", "project-1"]]) });
+  assert.deepEqual(parseArgs(["init", "--project-id", "project-1"]), { command: "init", target: undefined, args: [], flags: new Map([["project-id", "project-1"]]) });
   assert.equal(parseArgs(["push", "tasks", "--apply"]).target, "tasks");
+  assert.deepEqual(parseArgs(["tasks", "note", "task-1", "Seguimos", "mañana"]).args, ["task-1", "Seguimos", "mañana"]);
 });
 
 test("rejects a missing Senda structure", async () => {

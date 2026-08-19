@@ -52,6 +52,7 @@ export function InternalShell({
     {
       label: "Herramientas",
       items: [
+        { href: "/workspace/cli", label: "Senda CLI", icon: "document" },
         ...(active
           ? ([{ href: `/projects/${active.id}/assistant`, label: "Senda AI", icon: "sparkles" }] as const)
           : []),
