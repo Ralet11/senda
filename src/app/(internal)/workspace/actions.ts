@@ -1,12 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { DevTaskStatus, ProjectMemberRole } from "@/generated/prisma/enums";
+import { DevTaskStatus, DevTaskUrgency, ProjectMemberRole } from "@/generated/prisma/enums";
 import { requireAdmin, requireProjectDeveloper, requireProjectManager, requireInternal } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 
 const STATUSES = new Set<DevTaskStatus>(["IDEAS", "IN_PROGRESS", "APPLIED", "DONE"]);
+const URGENCIES = new Set<DevTaskUrgency>(["NORMAL", "HIGH", "URGENT"]);
 const INTERNAL_PROJECT_ROLES = new Set<ProjectMemberRole>(["PROJECT_MANAGER", "DEVELOPER"]);
 const TASK_ASSIGNEE_ROLES = new Set<ProjectMemberRole>(["PROJECT_MANAGER", "DEVELOPER", "TEAM"]);
 
@@ -25,6 +26,7 @@ export async function createDevTaskAction(formData: FormData) {
   const description = value(formData, "description");
   const status = value(formData, "status") as DevTaskStatus;
   const priority = Number(value(formData, "priority") || 2);
+  const urgency = value(formData, "urgency") as DevTaskUrgency;
   if (!projectId || !title || title.length > 160) return;
   const actor = await requireProjectDeveloper(projectId);
   await prisma.devTask.create({
@@ -34,6 +36,7 @@ export async function createDevTaskAction(formData: FormData) {
       description: description || null,
       status: STATUSES.has(status) ? status : "IDEAS",
       priority: clampPriority(priority),
+      urgency: URGENCIES.has(urgency) ? urgency : "NORMAL",
       // Una tarea creada directamente en trabajo activo ya tiene dueño.
       ...(status === "IN_PROGRESS" ? { assigneeId: actor.id } : {}),
     },
@@ -73,6 +76,7 @@ export async function updateDevTaskAction(formData: FormData) {
   const description = value(formData, "description");
   const status = value(formData, "status") as DevTaskStatus;
   const priority = Number(value(formData, "priority") || 2);
+  const urgency = value(formData, "urgency") as DevTaskUrgency;
   const requestedAssigneeId = value(formData, "assigneeId");
   if (!taskId || !title || title.length > 160) return;
 
@@ -113,9 +117,26 @@ export async function updateDevTaskAction(formData: FormData) {
       title,
       description: description || null,
       priority: clampPriority(priority),
+      urgency: URGENCIES.has(urgency) ? urgency : "NORMAL",
       ...(nextStatus ? { status: nextStatus } : {}),
       assigneeId,
     },
+  });
+  revalidatePath("/workspace");
+  revalidatePath("/workspace/tareas");
+}
+
+export async function addDevTaskNoteAction(formData: FormData) {
+  const taskId = value(formData, "taskId");
+  const content = value(formData, "content");
+  if (!taskId || !content || content.length > 2_000) return;
+
+  const task = await prisma.devTask.findUnique({ where: { id: taskId }, select: { projectId: true } });
+  if (!task) return;
+  const author = await requireProjectDeveloper(task.projectId);
+
+  await prisma.devTaskNote.create({
+    data: { taskId, authorId: author.id, content },
   });
   revalidatePath("/workspace");
   revalidatePath("/workspace/tareas");

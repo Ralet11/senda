@@ -3,8 +3,9 @@
 import { useState, useTransition, type DragEvent } from "react";
 import { Drawer } from "@/components/ui/drawer";
 import { Avatar, Chip, Field, SectionHeader } from "@/components/ui/primitives";
-import { IconPlus } from "@/components/ui/icons";
+import { IconAlert, IconMessage, IconPlus } from "@/components/ui/icons";
 import {
+  addDevTaskNoteAction,
   createDevTaskAction,
   deleteDevTaskAction,
   moveDevTask,
@@ -22,6 +23,13 @@ export type BoardTask = {
   /** Referencia estable cuando la tarea fue sincronizada desde .senda/tasks.json. */
   externalRef?: string | null;
   assignee: { id: string; name: string } | null;
+  urgency: "NORMAL" | "HIGH" | "URGENT";
+  notes: Array<{
+    id: string;
+    content: string;
+    createdAt: string;
+    author: { id: string; name: string };
+  }>;
 };
 
 const PRIORITY_TONE: Record<number, "danger" | "warn" | "neutral"> = {
@@ -29,6 +37,12 @@ const PRIORITY_TONE: Record<number, "danger" | "warn" | "neutral"> = {
   2: "warn",
   1: "neutral",
 };
+
+const URGENCY_OPTIONS = [
+  { value: "NORMAL", label: "Normal" },
+  { value: "HIGH", label: "Requiere atención" },
+  { value: "URGENT", label: "Urgente" },
+] as const;
 
 /**
  * Tablero de trabajo interno.
@@ -138,6 +152,11 @@ export function TaskBoard({
                       <option value="2">Prioridad media</option>
                       <option value="1">Prioridad baja</option>
                     </select>
+                    <select name="urgency" defaultValue="NORMAL" className="flex-1" aria-label="Urgencia">
+                      {URGENCY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
                     <button className="sd-btn sd-btn-primary sd-btn-sm">Agregar</button>
                   </div>
                 </form>
@@ -164,6 +183,13 @@ export function TaskBoard({
                       draggingId === task.id && "opacity-40",
                     )}
                   >
+                    {task.urgency === "URGENT" ? (
+                      <Chip tone="danger" className="mb-2 w-fit gap-1 text-[10.5px]">
+                        <IconAlert size={12} /> Urgente
+                      </Chip>
+                    ) : task.urgency === "HIGH" ? (
+                      <Chip tone="warn" className="mb-2 w-fit text-[10.5px]">Atención</Chip>
+                    ) : null}
                     <p className="text-[13.5px] font-medium leading-snug">{task.title}</p>
                     {task.description ? (
                       <p className="mt-1 line-clamp-2 text-[12.5px] leading-relaxed text-ink-3">
@@ -189,7 +215,12 @@ export function TaskBoard({
                           CLI
                         </Chip>
                       ) : null}
-                      <span className="ml-auto text-[11px] text-ink-3">{formatRelativeDay(task.updatedAt)}</span>
+                      {task.notes.length > 0 ? (
+                        <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-ink-3">
+                          <IconMessage size={13} /> {task.notes.length}
+                        </span>
+                      ) : null}
+                      <span className={task.notes.length > 0 ? "text-[11px] text-ink-3" : "ml-auto text-[11px] text-ink-3"}>{formatRelativeDay(task.updatedAt)}</span>
                     </div>
                   </article>
                 ))}
@@ -250,6 +281,18 @@ export function TaskBoard({
                 </Field>
               </div>
 
+              <Field
+                label="Urgencia"
+                htmlFor="task-urgency"
+                hint="Usá Urgente sólo si necesita atención inmediata del equipo."
+              >
+                <select id="task-urgency" name="urgency" defaultValue={selected.urgency}>
+                  {URGENCY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </Field>
+
               {canAssign ? (
                 <Field
                   label="Responsable"
@@ -271,6 +314,42 @@ export function TaskBoard({
 
               <button className="sd-btn sd-btn-primary w-full">Guardar cambios</button>
             </form>
+
+            <section className="border-t border-line pt-5">
+              <SectionHeader
+                title={`Notas del equipo${selected.notes.length ? ` · ${selected.notes.length}` : ""}`}
+                description="Contexto interno visible para quienes trabajan en este proyecto."
+              />
+
+              {selected.notes.length > 0 ? (
+                <ol className="mt-4 space-y-3">
+                  {selected.notes.map((note) => (
+                    <li key={note.id} className="rounded-panel border border-line bg-raised px-3 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <Avatar name={note.author.name} size={20} />
+                        <span className="text-[12px] font-medium text-ink">{note.author.name}</span>
+                        <span className="text-[11px] text-ink-3">{formatRelativeDay(note.createdAt)}</span>
+                      </div>
+                      <p className="mt-2 whitespace-pre-wrap text-[12.5px] leading-relaxed text-ink-2">{note.content}</p>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="mt-4 text-[12.5px] text-ink-3">Todavía no hay notas. Dejá contexto para que otro dev pueda continuar.</p>
+              )}
+
+              <form action={addDevTaskNoteAction} onSubmit={(event) => event.currentTarget.reset()} className="mt-4 space-y-2">
+                <input type="hidden" name="taskId" value={selected.id} />
+                <textarea
+                  name="content"
+                  required
+                  maxLength={2_000}
+                  rows={3}
+                  placeholder="Agregá una nota, bloqueo, decisión o próximo paso…"
+                />
+                <button className="sd-btn sd-btn-outline sd-btn-sm">Agregar nota</button>
+              </form>
+            </section>
 
             <div className="border-t border-line pt-5">
               <SectionHeader title="Zona sensible" description="Eliminar una tarea no se puede deshacer." />

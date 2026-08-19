@@ -42,8 +42,14 @@ export default async function WorkspaceTasksPage({
 
   const devTasks = await prisma.devTask.findMany({
     where: { projectId: project.id },
-    orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
-    include: { assignee: { select: { id: true, name: true } } },
+    orderBy: [{ urgency: "desc" }, { priority: "desc" }, { updatedAt: "desc" }],
+    include: {
+      assignee: { select: { id: true, name: true } },
+      notes: {
+        orderBy: { createdAt: "desc" },
+        include: { author: { select: { id: true, name: true } } },
+      },
+    },
   });
 
   const membership = isAdmin
@@ -77,6 +83,13 @@ export default async function WorkspaceTasksPage({
     updatedAt: task.updatedAt.toISOString(),
     externalRef: task.externalRef,
     assignee: task.assignee,
+    urgency: task.urgency,
+    notes: task.notes.map((note) => ({
+      id: note.id,
+      content: note.content,
+      createdAt: note.createdAt.toISOString(),
+      author: note.author,
+    })),
   }));
 
   const byStatus = (status: TaskStatus) => tasks.filter((task) => task.status === status).length;
