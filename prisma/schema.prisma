@@ -115,6 +115,7 @@ model User {
   projectUpdates           ProjectUpdate[]
   askedProjectQuestions    ProjectQuestion[]           @relation("ProjectQuestionAsker")
   answeredProjectQuestions ProjectQuestion[]           @relation("ProjectQuestionAnswerer")
+  assignedDevTasks         DevTask[]                   @relation("DevTaskAssignee")
 }
 
 // Sesión persistida en DB (en vez de JWT) para poder invalidar logins con un delete.
@@ -128,29 +129,29 @@ model Session {
 }
 
 model Project {
-  id                String       @id @default(cuid())
-  name              String
-  phase             ProjectPhase @default(DISCOVERY)
-  progress          Int          @default(0) // 0-100
-  summary           String? // brief usado como contexto del AI assistant
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  id        String       @id @default(cuid())
+  name      String
+  phase     ProjectPhase @default(DISCOVERY)
+  progress  Int          @default(0) // 0-100
+  summary   String? // brief usado como contexto del AI assistant
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
-  members           ProjectMember[]
-  milestones        Milestone[]
-  activityLogs      ActivityLog[]
-  messages          Message[]
-  attachments       ChatAttachment[]
-  conversations     ProjectConversation[]
-  assistantSessions AssistantSession[]
-  proposals         Proposal[]
-  contextChunks     ProjectContextChunk[]
-  updates           ProjectUpdate[]
+  members            ProjectMember[]
+  milestones         Milestone[]
+  activityLogs       ActivityLog[]
+  messages           Message[]
+  attachments        ChatAttachment[]
+  conversations      ProjectConversation[]
+  assistantSessions  AssistantSession[]
+  proposals          Proposal[]
+  contextChunks      ProjectContextChunk[]
+  updates            ProjectUpdate[]
   knowledgeDocuments ProjectKnowledgeDocument[]
-  questions         ProjectQuestion[]
-  devTasks          DevTask[]
-  agentTokens       ProjectAgentToken[]
-  agentSyncEvents   ProjectAgentSyncEvent[]
+  questions          ProjectQuestion[]
+  devTasks           DevTask[]
+  agentTokens        ProjectAgentToken[]
+  agentSyncEvents    ProjectAgentSyncEvent[]
 }
 
 model DevTask {
@@ -162,27 +163,30 @@ model DevTask {
   status      DevTaskStatus @default(IDEAS)
   priority    Int           @default(2)
   externalRef String?
+  assignee    User?         @relation("DevTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  assigneeId  String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  @@index([projectId, status, updatedAt])
   @@unique([projectId, externalRef])
+  @@index([projectId, status, updatedAt])
+  @@index([projectId, assigneeId, updatedAt])
 }
 
 // Credenciales de integracion por proyecto. Solo se conserva el hash del token;
 // el valor en claro se entrega una vez al crearla y se puede revocar en cualquier momento.
 model ProjectAgentToken {
-  id          String                    @id @default(cuid())
-  project     Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  projectId   String
-  label       String
-  tokenHash   String                    @unique
-  scopes      ProjectAgentTokenScope[]
-  expiresAt   DateTime?
-  lastUsedAt  DateTime?
-  revokedAt   DateTime?
-  createdAt   DateTime                  @default(now())
-  syncEvents  ProjectAgentSyncEvent[]
+  id         String                   @id @default(cuid())
+  project    Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId  String
+  label      String
+  tokenHash  String                   @unique
+  scopes     ProjectAgentTokenScope[]
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime                 @default(now())
+  syncEvents ProjectAgentSyncEvent[]
 
   @@index([projectId, revokedAt])
 }
@@ -190,16 +194,16 @@ model ProjectAgentToken {
 // Hace idempotente cada envio de la CLI: reintentar una misma operacion no duplica tareas,
 // hitos ni updates si la red se corta despues de que Senda acepto el request.
 model ProjectAgentSyncEvent {
-  id             String             @id @default(cuid())
-  project        Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id             String            @id @default(cuid())
+  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId      String
-  token          ProjectAgentToken  @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  token          ProjectAgentToken @relation(fields: [tokenId], references: [id], onDelete: Cascade)
   tokenId        String
   idempotencyKey String
   action         String
   payloadHash    String
   resultJson     String
-  createdAt      DateTime           @default(now())
+  createdAt      DateTime          @default(now())
 
   @@unique([tokenId, idempotencyKey])
   @@index([projectId, createdAt])
@@ -264,14 +268,14 @@ model ProjectMember {
 }
 
 model Milestone {
-  id        String    @id @default(cuid())
-  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  projectId String
-  title     String
-  dueDate   DateTime?
-  doneAt    DateTime?
+  id          String    @id @default(cuid())
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String
+  title       String
+  dueDate     DateTime?
+  doneAt      DateTime?
   externalRef String?
-  createdAt DateTime  @default(now())
+  createdAt   DateTime  @default(now())
 
   @@unique([projectId, externalRef])
 }

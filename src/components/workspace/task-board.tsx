@@ -2,7 +2,7 @@
 
 import { useState, useTransition, type DragEvent } from "react";
 import { Drawer } from "@/components/ui/drawer";
-import { Chip, Field, SectionHeader } from "@/components/ui/primitives";
+import { Avatar, Chip, Field, SectionHeader } from "@/components/ui/primitives";
 import { IconPlus } from "@/components/ui/icons";
 import {
   createDevTaskAction,
@@ -21,6 +21,7 @@ export type BoardTask = {
   updatedAt: string;
   /** Referencia estable cuando la tarea fue sincronizada desde .senda/tasks.json. */
   externalRef?: string | null;
+  assignee: { id: string; name: string } | null;
 };
 
 const PRIORITY_TONE: Record<number, "danger" | "warn" | "neutral"> = {
@@ -38,7 +39,19 @@ const PRIORITY_TONE: Record<number, "danger" | "warn" | "neutral"> = {
  * 2. El detalle se abre en un panel lateral, no en otra pantalla, para no
  *    perder de vista el tablero mientras se edita.
  */
-export function TaskBoard({ projectId, tasks }: { projectId: string; tasks: BoardTask[] }) {
+export function TaskBoard({
+  projectId,
+  tasks,
+  currentUser,
+  assignees,
+  canAssign,
+}: {
+  projectId: string;
+  tasks: BoardTask[];
+  currentUser: { id: string; name: string };
+  assignees: Array<{ id: string; name: string }>;
+  canAssign: boolean;
+}) {
   const [items, setItems] = useState(tasks);
   const [syncedTasks, setSyncedTasks] = useState(tasks);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -65,7 +78,11 @@ export function TaskBoard({ projectId, tasks }: { projectId: string; tasks: Boar
     const current = items.find((task) => task.id === id);
     if (!current || current.status === status) return;
 
-    setItems((list) => list.map((task) => (task.id === id ? { ...task, status } : task)));
+    setItems((list) => list.map((task) => (
+      task.id === id
+        ? { ...task, status, ...(status === "IN_PROGRESS" ? { assignee: currentUser } : {}) }
+        : task
+    )));
     startTransition(() => {
       void moveDevTask(id, status);
     });
@@ -153,6 +170,16 @@ export function TaskBoard({ projectId, tasks }: { projectId: string; tasks: Boar
                         {task.description}
                       </p>
                     ) : null}
+                    <div className="mt-2 flex min-w-0 items-center gap-1.5 text-[11.5px] text-ink-3">
+                      {task.assignee ? (
+                        <>
+                          <Avatar name={task.assignee.name} size={18} />
+                          <span className="truncate">{task.assignee.name}</span>
+                        </>
+                      ) : (
+                        <span>Sin responsable</span>
+                      )}
+                    </div>
                     <div className="mt-2.5 flex items-center gap-2">
                       <Chip tone={PRIORITY_TONE[task.priority] ?? "neutral"} className="text-[10.5px]">
                         {PRIORITY_LABELS[task.priority] ?? "Media"}
@@ -222,6 +249,25 @@ export function TaskBoard({ projectId, tasks }: { projectId: string; tasks: Boar
                   </select>
                 </Field>
               </div>
+
+              {canAssign ? (
+                <Field
+                  label="Responsable"
+                  htmlFor="task-assignee"
+                  hint="Al mover una tarea a En aplicación se asigna automáticamente a quien la toma."
+                >
+                  <select id="task-assignee" name="assigneeId" defaultValue={selected.assignee?.id ?? ""}>
+                    <option value="">Sin asignar</option>
+                    {assignees.map((person) => (
+                      <option key={person.id} value={person.id}>{person.name}</option>
+                    ))}
+                  </select>
+                </Field>
+              ) : (
+                <div className="rounded-control bg-raised px-3 py-2.5 text-[12.5px] text-ink-2">
+                  Responsable: <strong className="text-ink">{selected.assignee?.name ?? "sin asignar"}</strong>
+                </div>
+              )}
 
               <button className="sd-btn sd-btn-primary w-full">Guardar cambios</button>
             </form>

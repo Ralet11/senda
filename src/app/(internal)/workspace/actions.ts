@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 
 const STATUSES = new Set<DevTaskStatus>(["IDEAS", "IN_PROGRESS", "APPLIED", "DONE"]);
 const INTERNAL_PROJECT_ROLES = new Set<ProjectMemberRole>(["PROJECT_MANAGER", "DEVELOPER"]);
+const TASK_ASSIGNEE_ROLES = new Set<ProjectMemberRole>(["PROJECT_MANAGER", "DEVELOPER", "TEAM"]);
 
 function value(formData: FormData, name: string) {
   const input = formData.get(name);
@@ -25,7 +26,7 @@ export async function createDevTaskAction(formData: FormData) {
   const status = value(formData, "status") as DevTaskStatus;
   const priority = Number(value(formData, "priority") || 2);
   if (!projectId || !title || title.length > 160) return;
-  await requireProjectDeveloper(projectId);
+  const actor = await requireProjectDeveloper(projectId);
   await prisma.devTask.create({
     data: {
       projectId,
@@ -33,6 +34,8 @@ export async function createDevTaskAction(formData: FormData) {
       description: description || null,
       status: STATUSES.has(status) ? status : "IDEAS",
       priority: clampPriority(priority),
+      // Una tarea creada directamente en trabajo activo ya tiene dueño.
+      ...(status === "IN_PROGRESS" ? { assigneeId: actor.id } : {}),
     },
   });
   revalidatePath("/workspace");
@@ -53,8 +56,13 @@ export async function moveDevTask(taskId: string, status: DevTaskStatus) {
   if (!taskId || !STATUSES.has(status)) return;
   const task = await prisma.devTask.findUnique({ where: { id: taskId }, select: { projectId: true } });
   if (!task) return;
-  await requireProjectDeveloper(task.projectId);
-  await prisma.devTask.update({ where: { id: taskId }, data: { status } });
+  const actor = await requireProjectDeveloper(task.projectId);
+  await prisma.devTask.update({
+    where: { id: taskId },
+    // Entrar a “En aplicación” expresa que quien movió la tarjeta tomó el trabajo.
+    // Los estados posteriores conservan esa responsabilidad como trazabilidad.
+    data: { status, ...(status === "IN_PROGRESS" ? { assigneeId: actor.id } : {}) },
+  });
   revalidatePath("/workspace");
   revalidatePath("/workspace/tareas");
 }
@@ -65,11 +73,39 @@ export async function updateDevTaskAction(formData: FormData) {
   const description = value(formData, "description");
   const status = value(formData, "status") as DevTaskStatus;
   const priority = Number(value(formData, "priority") || 2);
+  const requestedAssigneeId = value(formData, "assigneeId");
   if (!taskId || !title || title.length > 160) return;
 
-  const task = await prisma.devTask.findUnique({ where: { id: taskId }, select: { projectId: true } });
+  const task = await prisma.devTask.findUnique({ where: { id: taskId }, select: { projectId: true, assigneeId: true } });
   if (!task) return;
-  await requireProjectDeveloper(task.projectId);
+  const actor = await requireProjectDeveloper(task.projectId);
+  const membership = actor.globalRole === "ADMIN"
+    ? null
+    : await prisma.projectMember.findUnique({ where: { projectId_userId: { projectId: task.projectId, userId: actor.id } }, select: { role: true } });
+  const canAssign = actor.globalRole === "ADMIN" || Boolean(membership && ["PROJECT_MANAGER", "TEAM"].includes(membership.role));
+
+  let assigneeId = task.assigneeId;
+  if (requestedAssigneeId) {
+    if (!canAssign && requestedAssigneeId !== actor.id) return;
+    const assignee = await prisma.user.findFirst({
+      where: {
+        id: requestedAssigneeId,
+        isActive: true,
+        OR: [
+          { id: actor.id },
+          { globalRole: "DEV", memberships: { some: { projectId: task.projectId, role: { in: [...TASK_ASSIGNEE_ROLES] } } } },
+        ],
+      },
+      select: { id: true },
+    });
+    if (!assignee) return;
+    assigneeId = assignee.id;
+  } else if (canAssign && formData.has("assigneeId")) {
+    assigneeId = null;
+  }
+
+  const nextStatus = STATUSES.has(status) ? status : undefined;
+  if (nextStatus === "IN_PROGRESS" && !assigneeId) assigneeId = actor.id;
 
   await prisma.devTask.update({
     where: { id: taskId },
@@ -77,7 +113,8 @@ export async function updateDevTaskAction(formData: FormData) {
       title,
       description: description || null,
       priority: clampPriority(priority),
-      ...(STATUSES.has(status) ? { status } : {}),
+      ...(nextStatus ? { status: nextStatus } : {}),
+      assigneeId,
     },
   });
   revalidatePath("/workspace");

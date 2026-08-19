@@ -43,6 +43,29 @@ export default async function WorkspaceTasksPage({
   const devTasks = await prisma.devTask.findMany({
     where: { projectId: project.id },
     orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
+    include: { assignee: { select: { id: true, name: true } } },
+  });
+
+  const membership = isAdmin
+    ? null
+    : await prisma.projectMember.findUnique({
+        where: { projectId_userId: { projectId: project.id, userId: user.id } },
+        select: { role: true },
+      });
+  const canAssign = isAdmin || Boolean(membership && ["PROJECT_MANAGER", "TEAM"].includes(membership.role));
+  const assignees = await prisma.user.findMany({
+    where: {
+      isActive: true,
+      OR: [
+        { id: user.id },
+        {
+          globalRole: "DEV",
+          memberships: { some: { projectId: project.id, role: { in: ["PROJECT_MANAGER", "DEVELOPER", "TEAM"] } } },
+        },
+      ],
+    },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
   });
 
   const tasks: BoardTask[] = devTasks.map((task) => ({
@@ -53,6 +76,7 @@ export default async function WorkspaceTasksPage({
     priority: task.priority,
     updatedAt: task.updatedAt.toISOString(),
     externalRef: task.externalRef,
+    assignee: task.assignee,
   }));
 
   const byStatus = (status: TaskStatus) => tasks.filter((task) => task.status === status).length;
@@ -90,7 +114,13 @@ export default async function WorkspaceTasksPage({
         />
       </div>
 
-      <TaskBoard projectId={project.id} tasks={tasks} />
+      <TaskBoard
+        projectId={project.id}
+        tasks={tasks}
+        currentUser={{ id: user.id, name: user.name }}
+        assignees={assignees}
+        canAssign={canAssign}
+      />
 
       <p className="mt-4 text-[12px] text-ink-3">
         Columnas: {TASK_COLUMNS.map((column) => column.label).join(" → ")}.
