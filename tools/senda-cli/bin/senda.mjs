@@ -73,9 +73,59 @@ function showTasks(result, asJson) {
   }
 }
 
+export function parseClaimTargets(args) {
+  const values = args.flatMap((value) => String(value).split(",").map((part) => part.trim()).filter(Boolean));
+  if (!values.length) fail("Indicá un id, una cantidad o all.");
+  if (values.length === 1 && /^\d+$/.test(values[0])) return { type: "count", count: Number(values[0]) };
+  if (values.length === 1 && values[0].toLowerCase() === "all") return { type: "all" };
+  return { type: "ids", ids: values };
+}
+
+async function availableTasks(config) {
+  return developerRequest(config, `?projectId=${encodeURIComponent(config.projectId)}&view=available`);
+}
+
+async function claimTask(config, taskId) {
+  return developerRequest(config, "", { method: "POST", body: JSON.stringify({ projectId: config.projectId, action: "claim", taskId }) });
+}
+
+async function claimMany(config, requested) {
+  let targets;
+  if (requested.type === "ids") {
+    targets = requested.ids;
+  } else {
+    const available = await availableTasks(config);
+    targets = available.tasks.map((task) => task.id);
+    if (requested.type === "count") {
+      if (!Number.isSafeInteger(requested.count) || requested.count < 1) fail("La cantidad debe ser un entero mayor a cero.");
+      targets = targets.slice(0, requested.count);
+    }
+  }
+
+  if (!targets.length) {
+    console.log("No hay ideas libres para reclamar.");
+    return;
+  }
+
+  const claimed = [];
+  const unavailable = [];
+  for (const taskId of targets) {
+    try {
+      const result = await claimTask(config, taskId);
+      claimed.push(result.task?.title ?? taskId);
+    } catch (error) {
+      unavailable.push({ taskId, message: error.message });
+    }
+  }
+
+  if (claimed.length) console.log(`Reclamaste ${claimed.length} tarea(s):\n${claimed.map((title) => `- ${title}`).join("\n")}`);
+  if (unavailable.length) console.log(`No se pudieron reclamar ${unavailable.length} tarea(s), posiblemente porque otro dev las tomó:\n${unavailable.map(({ taskId }) => `- ${taskId}`).join("\n")}`);
+  if (!claimed.length) fail("No se pudo reclamar ninguna de las tareas solicitadas.");
+}
+
 async function tasks(root, target, args, flags) {
   if (!target || flags.get("help")) {
-    console.log("Uso: senda tasks mine|available [--json] | senda tasks claim <task-id> | senda tasks status <task-id> <IDEAS|IN_PROGRESS|APPLIED|DONE> | senda tasks note <task-id> <texto>");
+    console.log("Uso: senda tasks mine|available [--json] | senda tasks claim <id>|<cantidad>|all|<id1,id2,...> | senda tasks status <task-id> <IDEAS|IN_PROGRESS|APPLIED|DONE> | senda tasks note <task-id> <texto>");
     return;
   }
   const config = await loadConfig(root);
@@ -84,13 +134,12 @@ async function tasks(root, target, args, flags) {
     showTasks(result, Boolean(flags.get("json")));
     return;
   }
-  const taskId = args[0];
-  if (!taskId) fail("Indica el id de la tarea.");
   if (target === "claim") {
-    const result = await developerRequest(config, "", { method: "POST", body: JSON.stringify({ projectId: config.projectId, action: "claim", taskId }) });
-    console.log(`Tarea reclamada: ${result.task?.title ?? taskId}. Quedo En aplicacion y asignada a vos.`);
+    await claimMany(config, parseClaimTargets(args));
     return;
   }
+  const taskId = args[0];
+  if (!taskId) fail("Indicá el id de la tarea.");
   if (target === "status") {
     const status = args[1];
     if (!VALID_STATUSES.has(status)) fail("Estado invalido. Usa IDEAS, IN_PROGRESS, APPLIED o DONE.");
@@ -105,7 +154,7 @@ async function tasks(root, target, args, flags) {
     console.log("Nota agregada.");
     return;
   }
-  fail("Usa: senda tasks mine|available|claim|status|note");
+  fail("Usá: senda tasks mine|available|claim|status|note");
 }
 
 async function markdownFiles(directory) {

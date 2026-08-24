@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { parseArgs, validateRoot } from "../bin/senda.mjs";
+import { parseArgs, parseClaimTargets, validateRoot } from "../bin/senda.mjs";
 
 test("parses flags before or after positional arguments", () => {
   assert.deepEqual(parseArgs(["init", "--project-id", "project-1"]), { command: "init", target: undefined, args: [], flags: new Map([["project-id", "project-1"]]) });
@@ -15,6 +15,13 @@ test("rejects a missing Senda structure", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "senda-cli-"));
   const errors = await validateRoot(root);
   assert.ok(errors.some((item) => item.includes("senda.config")));
+});
+
+test("parses single, multiple, counted and all task claims", () => {
+  assert.deepEqual(parseClaimTargets(["task-1"]), { type: "ids", ids: ["task-1"] });
+  assert.deepEqual(parseClaimTargets(["task-1,task-2", "task-3"]), { type: "ids", ids: ["task-1", "task-2", "task-3"] });
+  assert.deepEqual(parseClaimTargets(["4"]), { type: "count", count: 4 });
+  assert.deepEqual(parseClaimTargets(["all"]), { type: "all" });
 });
 
 test("accepts the minimum valid structure", async () => {
