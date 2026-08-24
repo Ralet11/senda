@@ -1,6 +1,6 @@
 {
   "name": "@prismadevs/senda-cli",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Inicializa, valida y sincroniza documentación operativa con Senda.",
   "license": "MIT",
   "type": "module",

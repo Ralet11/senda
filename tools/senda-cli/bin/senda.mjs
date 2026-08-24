@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { cp, mkdir, readFile, writeFile, access, readdir } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile, access, readdir } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -167,6 +167,19 @@ async function markdownFiles(directory) {
   return nested.flat();
 }
 
+async function copyMissing(source, destination) {
+  await mkdir(destination, { recursive: true });
+  for (const entry of await readdir(source, { withFileTypes: true })) {
+    const from = path.join(source, entry.name);
+    const to = path.join(destination, entry.name);
+    if (entry.isDirectory()) {
+      await copyMissing(from, to);
+    } else if (entry.isFile() && !await exists(to)) {
+      await copyFile(from, to);
+    }
+  }
+}
+
 async function knowledgePayload(base) {
   const root = path.join(base, "knowledge");
   return Promise.all((await markdownFiles(root)).sort().map(async (file) => ({ path: path.relative(root, file).replace(/\\/g, "/"), content: await readFile(file, "utf8") })));
@@ -210,8 +223,7 @@ export async function validateRoot(root) {
 async function init(root, flags) {
   const destination = projectDir(root);
   if (await exists(destination) && !flags.get("force")) fail("Ya existe .senda/. Usá --force sólo para completar archivos faltantes.");
-  await mkdir(destination, { recursive: true });
-  await cp(TEMPLATE_ROOT, destination, { recursive: true, force: Boolean(flags.get("force")), errorOnExist: !Boolean(flags.get("force")) });
+  await copyMissing(TEMPLATE_ROOT, destination);
   const configFile = path.join(destination, "senda.config.json");
   const config = await json(configFile);
   if (flags.get("project-id")) config.projectId = String(flags.get("project-id"));
