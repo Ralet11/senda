@@ -40,6 +40,11 @@ Git Bash / macOS / Linux:
 
 Estados posibles: IDEAS, IN_PROGRESS, APPLIED y DONE.
 
+Cada vez que ejecutas `senda tasks mine`, la CLI actualiza
+`.senda/.local/my-tasks.json`. Ese archivo no contiene tu token, esta ignorado
+por Git y permite que un agente con acceso al repositorio vea tus tareas sin
+necesitar credenciales. El campo `fetchedAt` indica cuando se consultaron.
+
 Un reclamo siempre es atomico: si otro desarrollador toma una tarea antes,
 Senda no la reasigna. En reclamos multiples se toman las que sigan libres y
 se informa cuales no estuvieron disponibles.

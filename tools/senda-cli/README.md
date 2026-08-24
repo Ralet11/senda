@@ -32,6 +32,8 @@ SENDA_DEV_TOKEN=senda_dt_... npx @prismadevs/senda-cli tasks status <task-id> AP
 SENDA_DEV_TOKEN=senda_dt_... npx @prismadevs/senda-cli tasks note <task-id> "ValidÃ© el flujo y queda pendiente revisiÃ³n"
 ```
 
+Cada `tasks mine` guarda un snapshot local sin credenciales en `.senda/.local/my-tasks.json`. La CLI crea `.senda/.gitignore` para excluirlo de Git; asÃ­ un agente autorizado en el mismo repositorio puede leer las tareas sin recibir `SENDA_DEV_TOKEN`.
+
 Si dos personas intentan reclamar la misma idea, Senda asigna la tarea a una sola. En reclamos mÃºltiples, las tareas que siguen libres se reclaman y las que otro dev tomÃ³ se informan al final, sin deshacer las demÃ¡s.
 
 `SENDA_TOKEN` nunca se guarda en `.senda/` ni en Git. Senda AI únicamente lee `.senda/knowledge/**/*.md`; no lee código ni los manifiestos de sincronización.

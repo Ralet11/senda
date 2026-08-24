@@ -11,10 +11,11 @@ Tu rol es mantener la documentación y los manifiestos de Senda después de anal
 
 ## Flujo de trabajo
 
-1. Revisá el cambio implementado y la documentación existente.
-2. Actualizá `knowledge/` si cambió una capacidad, un flujo o un límite confirmado.
-3. Actualizá `tasks.json`, `milestones.json` o `project-state.json` sólo cuando haya información verificable.
-4. Ejecutá `npx @prismadevs/senda-cli validate`.
-5. Mostrá el diff al responsable. Sólo después de aprobación explícita ejecutá `SENDA_TOKEN=... npx @prismadevs/senda-cli push all --apply`.
+1. Si existe `.senda/.local/my-tasks.json`, leelo antes de planificar trabajo personal. Es un snapshot local sin credenciales creado por `senda tasks mine`; indicá su `fetchedAt` si puede estar desactualizado. No lo edites ni lo subas a Git.
+2. Revisá el cambio implementado y la documentación existente.
+3. Actualizá `knowledge/` si cambió una capacidad, un flujo o un límite confirmado.
+4. Actualizá `tasks.json`, `milestones.json` o `project-state.json` sólo cuando haya información verificable.
+5. Ejecutá `npx @prismadevs/senda-cli validate`.
+6. Mostrá el diff al responsable. Sólo después de aprobación explícita ejecutá `SENDA_TOKEN=... npx @prismadevs/senda-cli push all --apply`.
 
 La sincronización crea o actualiza tareas e hitos por su `id`. Nunca borra elementos ni publica actualizaciones al cliente automáticamente.

@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { parseArgs, parseClaimTargets, validateRoot } from "../bin/senda.mjs";
+import { parseArgs, parseClaimTargets, validateRoot, writePersonalTaskContext } from "../bin/senda.mjs";
 
 test("parses flags before or after positional arguments", () => {
   assert.deepEqual(parseArgs(["init", "--project-id", "project-1"]), { command: "init", target: undefined, args: [], flags: new Map([["project-id", "project-1"]]) });
@@ -38,6 +38,18 @@ test("parses single, multiple, counted and all task claims", () => {
   assert.deepEqual(parseClaimTargets(["task-1,task-2", "task-3"]), { type: "ids", ids: ["task-1", "task-2", "task-3"] });
   assert.deepEqual(parseClaimTargets(["4"]), { type: "count", count: 4 });
   assert.deepEqual(parseClaimTargets(["all"]), { type: "all" });
+});
+
+test("writes an ignored local snapshot of personal tasks", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "senda-cli-tasks-"));
+  const task = { id: "task-1", title: "Validar onboarding", status: "IN_PROGRESS", notes: [] };
+  await writePersonalTaskContext(root, { projectId: "project-1" }, { tasks: [task] });
+  const snapshot = JSON.parse(await readFile(path.join(root, ".senda", ".local", "my-tasks.json"), "utf8"));
+  const gitignore = await readFile(path.join(root, ".senda", ".gitignore"), "utf8");
+  assert.equal(snapshot.projectId, "project-1");
+  assert.deepEqual(snapshot.tasks, [task]);
+  assert.equal(snapshot.source, "senda-cli/tasks-mine");
+  assert.match(gitignore, /^\.local\/$/m);
 });
 
 test("accepts the minimum valid structure", async () => {

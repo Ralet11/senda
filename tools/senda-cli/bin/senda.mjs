@@ -73,6 +73,35 @@ function showTasks(result, asJson) {
   }
 }
 
+async function ensureLocalContextIsIgnored(base) {
+  const gitignore = path.join(base, ".gitignore");
+  const entry = ".local/";
+  if (!await exists(gitignore)) {
+    await writeFile(gitignore, `${entry}\n`);
+    return;
+  }
+  const content = await readFile(gitignore, "utf8");
+  if (!content.split(/\r?\n/).map((line) => line.trim()).includes(entry)) {
+    await writeFile(gitignore, `${content.replace(/\s*$/, "")}\n${entry}\n`);
+  }
+}
+
+export async function writePersonalTaskContext(root, config, result) {
+  const base = projectDir(root);
+  const local = path.join(base, ".local");
+  await mkdir(base, { recursive: true });
+  await ensureLocalContextIsIgnored(base);
+  await mkdir(local, { recursive: true });
+  const snapshot = {
+    version: 1,
+    source: "senda-cli/tasks-mine",
+    fetchedAt: new Date().toISOString(),
+    projectId: config.projectId,
+    tasks: result.tasks ?? [],
+  };
+  await writeFile(path.join(local, "my-tasks.json"), `${JSON.stringify(snapshot, null, 2)}\n`);
+}
+
 export function parseClaimTargets(args) {
   const values = args.flatMap((value) => String(value).split(",").map((part) => part.trim()).filter(Boolean));
   if (!values.length) fail("Indicá un id, una cantidad o all.");
@@ -131,6 +160,7 @@ async function tasks(root, target, args, flags) {
   const config = await loadConfig(root);
   if (target === "mine" || target === "available") {
     const result = await developerRequest(config, `?projectId=${encodeURIComponent(config.projectId)}&view=${target}`);
+    if (target === "mine") await writePersonalTaskContext(root, config, result);
     showTasks(result, Boolean(flags.get("json")));
     return;
   }
