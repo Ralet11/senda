@@ -1,0 +1,77 @@
+SENDA CLI - GUIA RAPIDA DEL PROYECTO
+======================================
+
+Esta carpeta .senda/ conecta el proyecto con Senda. No guardes claves,
+credenciales, codigo fuente, archivos .env ni datos de clientes aqui.
+
+INSTALACION Y ACTUALIZACION
+---------------------------
+Instalar globalmente:
+  npm install -g @prismadevs/senda-cli
+
+Actualizar:
+  npm update -g @prismadevs/senda-cli
+
+Ayuda resumida:
+  senda --help
+
+TRABAJO PERSONAL DE DESARROLLADORES
+-----------------------------------
+1. Crea tu clave personal en Senda > Workspace > Senda CLI.
+2. Guardala solo en la sesion actual de tu terminal.
+
+PowerShell:
+  $env:SENDA_DEV_TOKEN = "senda_dt_..."
+
+Git Bash / macOS / Linux:
+  export SENDA_DEV_TOKEN="senda_dt_..."
+
+3. Consulta y trabaja tus tareas:
+  senda tasks mine
+  senda tasks available
+  senda tasks claim <id>
+  senda tasks claim 3
+  senda tasks claim all
+  senda tasks claim id-1,id-2,id-3
+  senda tasks status <id> IN_PROGRESS
+  senda tasks note <id> "Contexto, decision o bloqueo"
+  senda tasks status <id> APPLIED
+  senda tasks status <id> DONE
+
+Estados posibles: IDEAS, IN_PROGRESS, APPLIED y DONE.
+
+Un reclamo siempre es atomico: si otro desarrollador toma una tarea antes,
+Senda no la reasigna. En reclamos multiples se toman las que sigan libres y
+se informa cuales no estuvieron disponibles.
+
+SINCRONIZACION DEL AGENTE DEL PROYECTO
+--------------------------------------
+Solo el agente autorizado usa la clave de proyecto SENDA_TOKEN. Esta clave no
+sirve para tareas personales y nunca debe guardarse dentro de .senda/ o Git.
+
+Validar todo antes de sincronizar:
+  senda validate
+
+Solo comprobar la sincronizacion, sin enviar cambios:
+  senda push all
+
+Sincronizar con aprobacion explicita:
+  SENDA_TOKEN=senda_pt_... senda push knowledge --apply
+  SENDA_TOKEN=senda_pt_... senda push tasks --apply
+  SENDA_TOKEN=senda_pt_... senda push milestones --apply
+  SENDA_TOKEN=senda_pt_... senda push project-state --apply
+  SENDA_TOKEN=senda_pt_... senda push all --apply
+
+QUE LEE SENDA AI
+----------------
+Senda AI solo lee archivos Markdown dentro de .senda/knowledge/. Escribe ahi
+explicaciones funcionales confirmadas, aptas para clientes. Nunca copies codigo,
+secretos, infraestructura privada, tokens, URLs privadas o datos personales.
+
+ANTES DE ENVIAR CAMBIOS
+-----------------------
+1. Actualiza knowledge/, tasks.json, milestones.json o project-state.json con
+   informacion verificada.
+2. Ejecuta senda validate.
+3. Revisa el diff con el responsable.
+4. Solo entonces usa senda push ... --apply.

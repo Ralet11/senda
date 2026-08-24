@@ -251,4 +251,4 @@ export async function run(argv = process.argv.slice(2)) {
   fail(`Comando desconocido: ${command}`);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) run().catch((error) => { console.error(`Error: ${error.message}`); process.exitCode = 1; });
+if (process.argv[1] && path.basename(process.argv[1]) === "senda.mjs") run().catch((error) => { console.error(`Error: ${error.message}`); process.exitCode = 1; });

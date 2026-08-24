@@ -8,6 +8,8 @@ npx @prismadevs/senda-cli validate
 SENDA_TOKEN=senda_pt_... npx @prismadevs/senda-cli push all --apply
 ```
 
+`init` crea tambiÃ©n `.senda/SENDA_COMMANDS.txt`, una referencia local completa de comandos y reglas de uso.
+
 ## Trabajo personal de desarrolladores
 
 La clave del repositorio (`SENDA_TOKEN`) no sirve para tareas personales. Cada desarrollador crea su propia clave revocable en **Senda > Senda CLI** y la guarda sÃ³lo en su entorno como `SENDA_DEV_TOKEN`.
