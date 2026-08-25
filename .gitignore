@@ -3,6 +3,7 @@
 # dependencies
 /node_modules
 /tools/senda-cli/node_modules/
+/.senda-release-commit
 /.pnp
 .pnp.*
 .yarn/*

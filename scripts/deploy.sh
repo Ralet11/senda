@@ -7,6 +7,7 @@ BACKUP_ROOT="$(dirname "$APP_DIR")/backups"
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP_KEEP="${SENDA_BACKUP_KEEP:-3}"
 MIN_FREE_KB="${SENDA_MIN_FREE_KB:-3145728}"
+RELEASE_MARKER=".senda-release-commit"
 PREVIOUS_COMMIT=""
 BACKUP_DIR=""
 DEPLOY_COMPLETE=false
@@ -58,6 +59,7 @@ restore_previous_release() {
   set +a
   nice -n 10 npm run build
   pm2 restart senda --update-env
+  printf '%s\n' "$PREVIOUS_COMMIT" > "$RELEASE_MARKER"
 }
 
 rollback() {
@@ -120,19 +122,23 @@ ensure_free_space
 git fetch origin main
 PREVIOUS_COMMIT="$(git rev-parse HEAD)"
 TARGET_COMMIT="$(git rev-parse origin/main)"
+BUILT_COMMIT="$(cat "$RELEASE_MARKER" 2>/dev/null || true)"
 
 if [[ "$PREVIOUS_COMMIT" == "$TARGET_COMMIT" ]]; then
-  if [[ "${SENDA_RELOAD_ENV:-}" == "1" ]]; then
-    log "No hay cambios de codigo; recargando la configuracion de Senda."
+  if [[ "$BUILT_COMMIT" != "$PREVIOUS_COMMIT" ]]; then
+    log "El checkout está actualizado pero no hay un build confirmado para este commit; se reconstruirá Senda."
+  elif [[ "${SENDA_RELOAD_ENV:-}" == "1" ]]; then
+    log "No hay cambios de código; recargando la configuración de Senda."
     pm2 restart senda --update-env
     sleep 5
     curl -fsS --connect-timeout 10 http://127.0.0.1:3010/login > /dev/null
     pm2 save
-    log "Configuracion de Senda recargada."
+    log "Configuración de Senda recargada."
+    exit 0
+  else
+    log "Senda ya está en $PREVIOUS_COMMIT. No hay cambios para desplegar."
     exit 0
   fi
-  log "Senda ya esta en $PREVIOUS_COMMIT. No hay cambios para desplegar."
-  exit 0
 fi
 
 BACKUP_DIR="$BACKUP_ROOT/$TIMESTAMP-$PREVIOUS_COMMIT"
@@ -159,5 +165,6 @@ curl -fsS --connect-timeout 10 http://127.0.0.1:3010/login > /dev/null
 pm2 save
 
 DEPLOY_COMPLETE=true
+printf '%s\n' "$(git rev-parse HEAD)" > "$RELEASE_MARKER"
 prune_old_backups
 log "Deploy completado en $(git rev-parse --short HEAD). Se conservan $BACKUP_KEEP backups livianos."
