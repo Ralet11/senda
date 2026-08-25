@@ -6,7 +6,6 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
-import { Entry } from "@napi-rs/keyring";
 
 const CLI_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const TEMPLATE_ROOT = path.join(CLI_ROOT, "templates");
@@ -46,22 +45,27 @@ async function loadConfig(root) {
   return { projectId, baseUrl: baseUrl.toString().replace(/\/$/, "") };
 }
 
-function keyringEntry(config) {
-  return new Entry(KEYRING_SERVICE, config.baseUrl);
+async function keyringEntry(config) {
+  try {
+    const { Entry } = await import("@napi-rs/keyring");
+    return new Entry(KEYRING_SERVICE, config.baseUrl);
+  } catch {
+    fail("No se pudo acceder al almacén seguro del sistema. Podés usar SENDA_DEV_TOKEN temporalmente.");
+  }
 }
 
-function storedDeveloperToken(config) {
+async function storedDeveloperToken(config) {
   try {
-    return keyringEntry(config).getPassword()?.trim() || null;
+    return (await keyringEntry(config)).getPassword()?.trim() || null;
   } catch {
     return null;
   }
 }
 
-function developerToken(config) {
+async function developerToken(config) {
   const token = process.env.SENDA_DEV_TOKEN?.trim();
   if (token) return token;
-  const stored = storedDeveloperToken(config);
+  const stored = await storedDeveloperToken(config);
   if (stored) return stored;
   fail("No hay una sesiÃ³n de Senda CLI en esta computadora. EjecutÃ¡ `senda login`. Como alternativa temporal podÃ©s usar SENDA_DEV_TOKEN sÃ³lo en la sesiÃ³n actual.");
 }
@@ -69,7 +73,7 @@ function developerToken(config) {
 async function developerRequest(config, pathName, options = {}) {
   const response = await fetch(`${config.baseUrl}/api/external/v1/developer-tasks${pathName}`, {
     ...options,
-    headers: { authorization: `Bearer ${developerToken(config)}`, ...(options.body ? { "content-type": "application/json" } : {}), ...(options.headers ?? {}) },
+    headers: { authorization: `Bearer ${await developerToken(config)}`, ...(options.body ? { "content-type": "application/json" } : {}), ...(options.headers ?? {}) },
   });
   const data = await response.json().catch(() => null);
   if (!response.ok) {
@@ -254,7 +258,7 @@ async function login(root, flags) {
   const data = await response.json().catch(() => null);
   if (!response.ok || typeof data?.token !== "string") fail(data?.error || `Senda respondió HTTP ${response.status}.`);
   try {
-    keyringEntry(config).setPassword(data.token);
+    (await keyringEntry(config)).setPassword(data.token);
   } catch {
     fail("No se pudo guardar la sesión en el almacén seguro del sistema. No se guardó ninguna credencial; podés usar SENDA_DEV_TOKEN temporalmente.");
   }
@@ -263,7 +267,7 @@ async function login(root, flags) {
 
 async function logout(root) {
   const config = await loadConfig(root);
-  try { keyringEntry(config).deletePassword(); } catch { /* no persisted session */ }
+  try { (await keyringEntry(config)).deletePassword(); } catch { /* no persisted session */ }
   console.log("Sesión local de Senda CLI eliminada de esta computadora.");
 }
 
