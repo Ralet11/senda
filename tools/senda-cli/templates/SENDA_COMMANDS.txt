@@ -17,16 +17,14 @@ Ayuda resumida:
 
 TRABAJO PERSONAL DE DESARROLLADORES
 -----------------------------------
-1. Crea tu clave personal en Senda > Workspace > Senda CLI.
-2. Guardala solo en la sesion actual de tu terminal.
+1. Inicia sesión una vez en esta computadora:
+  senda login
 
-PowerShell:
-  $env:SENDA_DEV_TOKEN = "senda_dt_..."
+La CLI guarda la credencial personal en el almacén seguro del sistema, nunca
+en el repositorio ni en .senda/. Para eliminarla: senda logout
 
-Git Bash / macOS / Linux:
-  export SENDA_DEV_TOKEN="senda_dt_..."
-
-3. Consulta y trabaja tus tareas:
+2. Consulta y trabaja tus tareas:
+  senda tasks pull
   senda tasks mine
   senda tasks available
   senda tasks claim <id>
@@ -40,7 +38,7 @@ Git Bash / macOS / Linux:
 
 Estados posibles: IDEAS, IN_PROGRESS, APPLIED y DONE.
 
-Cada vez que ejecutas `senda tasks mine`, la CLI actualiza
+Cada vez que ejecutas `senda tasks pull` o `senda tasks mine`, la CLI actualiza
 `.senda/.local/my-tasks.json`. Ese archivo no contiene tu token, esta ignorado
 por Git y permite que un agente con acceso al repositorio vea tus tareas sin
 necesitar credenciales. El campo `fetchedAt` indica cuando se consultaron.

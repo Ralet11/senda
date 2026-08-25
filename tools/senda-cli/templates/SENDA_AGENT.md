@@ -11,7 +11,7 @@ Tu rol es mantener la documentación y los manifiestos de Senda después de anal
 
 ## Flujo de trabajo
 
-1. Si existe `.senda/.local/my-tasks.json`, leelo antes de planificar trabajo personal. Es un snapshot local sin credenciales creado por `senda tasks mine`; indicá su `fetchedAt` si puede estar desactualizado. No lo edites ni lo subas a Git.
+1. Para trabajo personal, ejecutá primero `senda tasks pull`. Eso actualiza `.senda/.local/my-tasks.json` sin exponerte credenciales. Luego leelo antes de planificar; indicá su `fetchedAt` si puede estar desactualizado. No lo edites ni lo subas a Git. Si la CLI informa que no hay sesión, pedile al desarrollador que ejecute `senda login`; nunca le pidas ni copies un token.
 2. Revisá el cambio implementado y la documentación existente.
 3. Actualizá `knowledge/` si cambió una capacidad, un flujo o un límite confirmado.
 4. Actualizá `tasks.json`, `milestones.json` o `project-state.json` sólo cuando haya información verificable.

@@ -12,27 +12,42 @@ SENDA_TOKEN=senda_pt_... npx @prismadevs/senda-cli push all --apply
 
 ## Trabajo personal de desarrolladores
 
-La clave del repositorio (`SENDA_TOKEN`) no sirve para tareas personales. Cada desarrollador crea su propia clave revocable en **Senda > Senda CLI** y la guarda sÃ³lo en su entorno como `SENDA_DEV_TOKEN`.
+La clave del repositorio (`SENDA_TOKEN`) no sirve para tareas personales. Desde la carpeta que contiene `.senda/`, cada desarrollador inicia una sesión una única vez:
+
+```bash
+senda login
+```
+
+La CLI verifica la cuenta de Senda, crea una clave personal revocable y la guarda en el almacén seguro del sistema operativo. No queda en Git, `.senda/`, `.env` ni en el contexto del agente. Para quitar el acceso local ejecutá `senda logout`.
+
+Después, tanto el desarrollador como el agente pueden usar estos comandos sin token visible:
+
+```bash
+senda tasks pull
+senda tasks mine
+```
+
+`SENDA_DEV_TOKEN` sigue siendo una alternativa temporal para automatizaciones controladas, pero no es necesario para el flujo habitual.
 
 ```bash
 # Ver Ãºnicamente mis tareas asignadas en el proyecto configurado en .senda/
-SENDA_DEV_TOKEN=senda_dt_... npx @prismadevs/senda-cli tasks mine
+senda tasks mine
 
 # Ver ideas libres y reclamar trabajo de forma atÃ³mica
-SENDA_DEV_TOKEN=senda_dt_... npx @prismadevs/senda-cli tasks available
-SENDA_DEV_TOKEN=senda_dt_... npx @prismadevs/senda-cli tasks claim <task-id>
+senda tasks available
+senda tasks claim <task-id>
 
 # Reclamar las primeras 4 ideas libres, todas, o una lista concreta de IDs
-SENDA_DEV_TOKEN=senda_dt_... npx @prismadevs/senda-cli tasks claim 4
-SENDA_DEV_TOKEN=senda_dt_... npx @prismadevs/senda-cli tasks claim all
-SENDA_DEV_TOKEN=senda_dt_... npx @prismadevs/senda-cli tasks claim id-1,id-2,id-3
+senda tasks claim 4
+senda tasks claim all
+senda tasks claim id-1,id-2,id-3
 
 # Informar avance o dejar contexto para el equipo
-SENDA_DEV_TOKEN=senda_dt_... npx @prismadevs/senda-cli tasks status <task-id> APPLIED
-SENDA_DEV_TOKEN=senda_dt_... npx @prismadevs/senda-cli tasks note <task-id> "ValidÃ© el flujo y queda pendiente revisiÃ³n"
+senda tasks status <task-id> APPLIED
+senda tasks note <task-id> "Validé el flujo y queda pendiente revisión"
 ```
 
-Cada `tasks mine` guarda un snapshot local sin credenciales en `.senda/.local/my-tasks.json`. La CLI crea `.senda/.gitignore` para excluirlo de Git; asÃ­ un agente autorizado en el mismo repositorio puede leer las tareas sin recibir `SENDA_DEV_TOKEN`.
+Cada `tasks pull` o `tasks mine` guarda un snapshot local sin credenciales en `.senda/.local/my-tasks.json`. La CLI crea `.senda/.gitignore` para excluirlo de Git; así un agente autorizado en el mismo repositorio puede leer las tareas sin recibir credenciales.
 
 Si dos personas intentan reclamar la misma idea, Senda asigna la tarea a una sola. En reclamos mÃºltiples, las tareas que siguen libres se reclaman y las que otro dev tomÃ³ se informan al final, sin deshacer las demÃ¡s.
 

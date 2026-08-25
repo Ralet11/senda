@@ -4,12 +4,16 @@ import { copyFile, mkdir, readFile, writeFile, access, readdir } from "node:fs/p
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { createInterface } from "node:readline/promises";
+import { stdin as input, stdout as output } from "node:process";
+import { Entry } from "@napi-rs/keyring";
 
 const CLI_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const TEMPLATE_ROOT = path.join(CLI_ROOT, "templates");
 const VALID_STATUSES = new Set(["IDEAS", "IN_PROGRESS", "APPLIED", "DONE"]);
 const VALID_PHASES = new Set(["DISCOVERY", "DESIGN", "DEVELOPMENT", "QA", "LAUNCHED"]);
 const SECRET_PATTERN = /(-----BEGIN [^-]+-----|\b(?:sk|rk|pk)_[A-Za-z0-9_-]{16,}|\b(?:postgres(?:ql)?:\/\/|mysql:\/\/|mongodb(?:\+srv)?:\/\/)|senda_(?:pt|dt)_[A-Za-z0-9_-]{20,})/i;
+const KEYRING_SERVICE = "com.prismadevs.senda-cli";
 
 export function parseArgs(argv) {
   const positionals = [];
@@ -42,16 +46,30 @@ async function loadConfig(root) {
   return { projectId, baseUrl: baseUrl.toString().replace(/\/$/, "") };
 }
 
-function developerToken() {
+function keyringEntry(config) {
+  return new Entry(KEYRING_SERVICE, config.baseUrl);
+}
+
+function storedDeveloperToken(config) {
+  try {
+    return keyringEntry(config).getPassword()?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function developerToken(config) {
   const token = process.env.SENDA_DEV_TOKEN?.trim();
-  if (!token) fail("Falta SENDA_DEV_TOKEN. Crea una clave personal en Senda > Senda CLI; nunca uses SENDA_TOKEN para tareas personales.");
-  return token;
+  if (token) return token;
+  const stored = storedDeveloperToken(config);
+  if (stored) return stored;
+  fail("No hay una sesiÃ³n de Senda CLI en esta computadora. EjecutÃ¡ `senda login`. Como alternativa temporal podÃ©s usar SENDA_DEV_TOKEN sÃ³lo en la sesiÃ³n actual.");
 }
 
 async function developerRequest(config, pathName, options = {}) {
   const response = await fetch(`${config.baseUrl}/api/external/v1/developer-tasks${pathName}`, {
     ...options,
-    headers: { authorization: `Bearer ${developerToken()}`, ...(options.body ? { "content-type": "application/json" } : {}), ...(options.headers ?? {}) },
+    headers: { authorization: `Bearer ${developerToken(config)}`, ...(options.body ? { "content-type": "application/json" } : {}), ...(options.headers ?? {}) },
   });
   const data = await response.json().catch(() => null);
   if (!response.ok) {
@@ -150,22 +168,25 @@ async function claimMany(config, requested) {
   if (claimed.length) console.log(`Reclamaste ${claimed.length} tarea(s):\n${claimed.map((title) => `- ${title}`).join("\n")}`);
   if (unavailable.length) console.log(`No se pudieron reclamar ${unavailable.length} tarea(s), posiblemente porque otro dev las tomó:\n${unavailable.map(({ taskId }) => `- ${taskId}`).join("\n")}`);
   if (!claimed.length) fail("No se pudo reclamar ninguna de las tareas solicitadas.");
+  return developerRequest(config, `?projectId=${encodeURIComponent(config.projectId)}&view=mine`);
 }
 
 async function tasks(root, target, args, flags) {
   if (!target || flags.get("help")) {
-    console.log("Uso: senda tasks mine|available [--json] | senda tasks claim <id>|<cantidad>|all|<id1,id2,...> | senda tasks status <task-id> <IDEAS|IN_PROGRESS|APPLIED|DONE> | senda tasks note <task-id> <texto>");
+    console.log("Uso: senda tasks pull|mine|available [--json] | senda tasks claim <id>|<cantidad>|all|<id1,id2,...> | senda tasks status <task-id> <IDEAS|IN_PROGRESS|APPLIED|DONE> | senda tasks note <task-id> <texto>");
     return;
   }
   const config = await loadConfig(root);
-  if (target === "mine" || target === "available") {
-    const result = await developerRequest(config, `?projectId=${encodeURIComponent(config.projectId)}&view=${target}`);
-    if (target === "mine") await writePersonalTaskContext(root, config, result);
+  if (target === "pull" || target === "mine" || target === "available") {
+    const view = target === "available" ? "available" : "mine";
+    const result = await developerRequest(config, `?projectId=${encodeURIComponent(config.projectId)}&view=${view}`);
+    if (view === "mine") await writePersonalTaskContext(root, config, result);
     showTasks(result, Boolean(flags.get("json")));
     return;
   }
   if (target === "claim") {
-    await claimMany(config, parseClaimTargets(args));
+    const mine = await claimMany(config, parseClaimTargets(args));
+    if (mine) await writePersonalTaskContext(root, config, mine);
     return;
   }
   const taskId = args[0];
@@ -174,6 +195,7 @@ async function tasks(root, target, args, flags) {
     const status = args[1];
     if (!VALID_STATUSES.has(status)) fail("Estado invalido. Usa IDEAS, IN_PROGRESS, APPLIED o DONE.");
     await developerRequest(config, "", { method: "POST", body: JSON.stringify({ projectId: config.projectId, action: "status", taskId, status }) });
+    await writePersonalTaskContext(root, config, await developerRequest(config, `?projectId=${encodeURIComponent(config.projectId)}&view=mine`));
     console.log(`Estado actualizado a ${status}.`);
     return;
   }
@@ -181,10 +203,68 @@ async function tasks(root, target, args, flags) {
     const content = args.slice(1).join(" ").trim();
     if (!content) fail("Escribi la nota despues del id de la tarea.");
     await developerRequest(config, "", { method: "POST", body: JSON.stringify({ projectId: config.projectId, action: "note", taskId, content }) });
+    await writePersonalTaskContext(root, config, await developerRequest(config, `?projectId=${encodeURIComponent(config.projectId)}&view=mine`));
     console.log("Nota agregada.");
     return;
   }
-  fail("Usá: senda tasks mine|available|claim|status|note");
+  fail("Usá: senda tasks pull|mine|available|claim|status|note");
+}
+
+async function prompt(question) {
+  const terminal = createInterface({ input, output });
+  try { return (await terminal.question(question)).trim(); } finally { terminal.close(); }
+}
+
+async function promptPassword(question) {
+  if (!input.isTTY) fail("`senda login` requiere una terminal interactiva para proteger tu contraseña.");
+  return new Promise((resolve, reject) => {
+    let value = "";
+    const wasRaw = input.isRaw;
+    output.write(question);
+    input.setRawMode(true);
+    input.resume();
+    const finish = () => {
+      input.removeListener("data", onData);
+      input.setRawMode(Boolean(wasRaw));
+      output.write("\n");
+    };
+    const onData = (chunk) => {
+      const char = chunk.toString("utf8");
+      if (char === "\u0003") { finish(); reject(new Error("Inicio de sesión cancelado.")); return; }
+      if (char === "\r" || char === "\n") { finish(); resolve(value); return; }
+      if (char === "\u007f" || char === "\b") { value = value.slice(0, -1); return; }
+      if (!/\p{C}/u.test(char)) value += char;
+    };
+    input.on("data", onData);
+  });
+}
+
+async function login(root, flags) {
+  const config = await loadConfig(root);
+  const email = String(flags.get("email") || await prompt("Email de Senda: ")).trim().toLowerCase();
+  const password = String(flags.get("password") || await promptPassword("Contraseña de Senda: "));
+  const label = String(flags.get("label") || `Senda CLI · ${process.env.COMPUTERNAME || process.env.HOSTNAME || "esta computadora"}`).trim().slice(0, 80);
+  if (!email || !password || !label) fail("Email, contraseña y etiqueta son obligatorios.");
+
+  const response = await fetch(`${config.baseUrl}/api/external/v1/developer-cli/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email, password, label }),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || typeof data?.token !== "string") fail(data?.error || `Senda respondió HTTP ${response.status}.`);
+  try {
+    keyringEntry(config).setPassword(data.token);
+  } catch {
+    fail("No se pudo guardar la sesión en el almacén seguro del sistema. No se guardó ninguna credencial; podés usar SENDA_DEV_TOKEN temporalmente.");
+  }
+  console.log(`Sesión iniciada para ${data.user?.name || email}. La credencial quedó en el almacén seguro de esta computadora, fuera del repositorio.`);
+}
+
+async function logout(root) {
+  const config = await loadConfig(root);
+  try { keyringEntry(config).deletePassword(); } catch { /* no persisted session */ }
+  console.log("Sesión local de Senda CLI eliminada de esta computadora.");
 }
 
 async function markdownFiles(directory) {
@@ -285,8 +365,10 @@ async function push(root, target, flags) {
 
 export async function run(argv = process.argv.slice(2)) {
   const { command, target, args, flags } = parseArgs(argv); const root = rootFrom(flags);
-  if (!command) { console.log("Uso: senda init [--project-id ID] | senda validate | senda push knowledge|tasks|milestones|project-state|all [--apply] | senda tasks mine|available|claim|status|note"); return; }
+  if (!command || flags.get("help")) { console.log("Uso: senda init [--project-id ID] | senda login | senda logout | senda validate | senda push knowledge|tasks|milestones|project-state|all [--apply] | senda tasks pull|mine|available|claim|status|note"); return; }
   if (command === "init") return init(root, flags);
+  if (command === "login") return login(root, flags);
+  if (command === "logout") return logout(root);
   if (command === "validate") { const errors = await validateRoot(root); if (errors.length) fail(`Validación fallida:\n- ${errors.join("\n- ")}`); console.log("Validación correcta: .senda está lista."); return; }
   if (command === "push") return push(root, target, flags);
   if (command === "tasks") return tasks(root, target, args, flags);
