@@ -12,6 +12,9 @@ Instalar globalmente:
 Actualizar:
   npm update -g @prismadevs/senda-cli
 
+Actualizar esta guia local despues de una actualizacion de CLI:
+  senda init --refresh-help
+
 Ayuda resumida:
   senda --help
 

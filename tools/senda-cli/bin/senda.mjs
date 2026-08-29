@@ -336,6 +336,12 @@ export async function validateRoot(root) {
 
 async function init(root, flags) {
   const destination = projectDir(root);
+  if (flags.get("refresh-help")) {
+    if (!await exists(destination)) fail("Falta .senda/. Ejecutá senda init primero.");
+    await copyFile(path.join(TEMPLATE_ROOT, "SENDA_COMMANDS.txt"), path.join(destination, "SENDA_COMMANDS.txt"));
+    console.log("Guía local de comandos actualizada.");
+    return;
+  }
   if (await exists(destination) && !flags.get("force")) fail("Ya existe .senda/. Usá --force sólo para completar archivos faltantes.");
   await copyMissing(TEMPLATE_ROOT, destination);
   const configFile = path.join(destination, "senda.config.json");
@@ -347,6 +353,7 @@ async function init(root, flags) {
   console.log("1. Completá .senda/knowledge/ con información funcional confirmada.");
   console.log("2. El agente debe seguir .senda/SENDA_AGENT.md.");
   console.log("3. Ejecutá: senda validate");
+  console.log("4. Si actualizás la CLI: senda init --refresh-help");
 }
 
 async function push(root, target, flags) {
@@ -371,7 +378,8 @@ async function push(root, target, flags) {
 
 export async function run(argv = process.argv.slice(2)) {
   const { command, target, args, flags } = parseArgs(argv); const root = rootFrom(flags);
-  if (!command || flags.get("help")) { console.log("Uso: senda init [--project-id ID] | senda login | senda logout | senda validate | senda push knowledge|tasks|milestones|project-state|all [--apply] | senda tasks pull|mine|available|claim|status|note"); return; }
+  if (flags.get("version") || command === "version") { console.log("0.7.1"); return; }
+  if (!command || flags.get("help")) { console.log("Uso: senda init [--project-id ID] [--refresh-help] | senda login | senda logout | senda validate | senda push knowledge|tasks|milestones|project-state|all [--apply] | senda tasks pull|mine|available|claim|status|note"); return; }
   if (command === "init") return init(root, flags);
   if (command === "login") return login(root, flags);
   if (command === "logout") return logout(root);

@@ -27,6 +27,16 @@ test("init creates the local commands guide", async () => {
   assert.match(guide, /senda tasks claim all/);
 });
 
+test("refresh-help updates only the local commands guide", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "senda-cli-help-"));
+  const bin = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../bin/senda.mjs");
+  execFileSync(process.execPath, [bin, "init", "--project-id", "project-1"], { cwd: root, encoding: "utf8" });
+  await writeFile(path.join(root, ".senda", "SENDA_COMMANDS.txt"), "guia vieja\n");
+  execFileSync(process.execPath, [bin, "init", "--refresh-help"], { cwd: root, encoding: "utf8" });
+  const guide = await readFile(path.join(root, ".senda", "SENDA_COMMANDS.txt"), "utf8");
+  assert.match(guide, /senda push all --apply/);
+});
+
 test("rejects a missing Senda structure", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "senda-cli-"));
   const errors = await validateRoot(root);

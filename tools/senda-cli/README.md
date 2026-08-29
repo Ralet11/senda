@@ -32,6 +32,12 @@ senda tasks mine
 
 `SENDA_TOKEN` queda reservado para CI o agentes no interactivos: se mantiene por compatibilidad y conserva los scopes restringidos del proyecto. Nunca hace falta para un desarrollador que ya ejecutó `senda login` y pertenece al proyecto.
 
+Si el proyecto ya tenía `.senda/` antes de actualizar la CLI, renová sólo la guía que leen los agentes (no modifica conocimiento ni manifiestos):
+
+```bash
+senda init --refresh-help
+```
+
 ```bash
 # Ver Ãºnicamente mis tareas asignadas en el proyecto configurado en .senda/
 senda tasks mine
