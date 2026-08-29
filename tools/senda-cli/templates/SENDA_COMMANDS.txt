@@ -47,10 +47,11 @@ Un reclamo siempre es atomico: si otro desarrollador toma una tarea antes,
 Senda no la reasigna. En reclamos multiples se toman las que sigan libres y
 se informa cuales no estuvieron disponibles.
 
-SINCRONIZACION DEL AGENTE DEL PROYECTO
---------------------------------------
-Solo el agente autorizado usa la clave de proyecto SENDA_TOKEN. Esta clave no
-sirve para tareas personales y nunca debe guardarse dentro de .senda/ o Git.
+SINCRONIZACION DEL PROYECTO
+---------------------------
+Despues de `senda login`, cualquier desarrollador asignado al proyecto puede
+sincronizar los manifiestos autorizados. La sesion personal queda en el almacen
+seguro del sistema, nunca dentro de .senda/ o Git.
 
 Validar todo antes de sincronizar:
   senda validate
@@ -59,11 +60,15 @@ Solo comprobar la sincronizacion, sin enviar cambios:
   senda push all
 
 Sincronizar con aprobacion explicita:
-  SENDA_TOKEN=senda_pt_... senda push knowledge --apply
-  SENDA_TOKEN=senda_pt_... senda push tasks --apply
-  SENDA_TOKEN=senda_pt_... senda push milestones --apply
-  SENDA_TOKEN=senda_pt_... senda push project-state --apply
-  SENDA_TOKEN=senda_pt_... senda push all --apply
+senda push knowledge --apply
+senda push tasks --apply
+senda push milestones --apply
+senda push project-state --apply
+senda push all --apply
+
+Para CI o un agente no interactivo sin acceso al almacen seguro, se puede usar
+SENDA_TOKEN como alternativa: es una clave restringida al proyecto y con
+scopes definidos. Nunca debe guardarse dentro de .senda/ o Git.
 
 QUE LEE SENDA AI
 ----------------

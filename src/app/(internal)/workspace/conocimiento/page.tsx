@@ -42,7 +42,7 @@ export default async function WorkspaceKnowledgePage({
     }),
     prisma.projectAgentSyncEvent.findMany({
       where: { projectId: project.id },
-      select: { id: true, action: true, createdAt: true, token: { select: { label: true } } },
+      select: { id: true, action: true, createdAt: true, token: { select: { label: true } }, developerToken: { select: { user: { select: { name: true } } } } },
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
@@ -124,7 +124,7 @@ export default async function WorkspaceKnowledgePage({
                 {events.map((event) => (
                   <li key={event.id} className="py-2.5 first:pt-0">
                     <p className="text-[13px] font-medium">{event.action}</p>
-                    <p className="mt-0.5 text-[11.5px] text-ink-3">{formatRelativeDay(event.createdAt)} · {event.token.label}</p>
+                    <p className="mt-0.5 text-[11.5px] text-ink-3">{formatRelativeDay(event.createdAt)} · {event.token?.label ?? event.developerToken?.user.name ?? "sesión personal"}</p>
                   </li>
                 ))}
               </ul>

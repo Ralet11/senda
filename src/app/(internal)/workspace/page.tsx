@@ -84,7 +84,7 @@ export default async function WorkspacePage({
     prisma.projectAgentSyncEvent.findFirst({
       where: { projectId: project.id },
       orderBy: { createdAt: "desc" },
-      include: { token: { select: { label: true } } },
+      include: { token: { select: { label: true } }, developerToken: { select: { user: { select: { name: true } } } } },
     }),
   ]);
 
@@ -247,7 +247,7 @@ export default async function WorkspacePage({
             <div className="mt-5 space-y-4">
               <div className="flex items-center justify-between gap-4"><div><p className="sd-numeric text-[25px] font-semibold leading-none">{knowledge.documentsCount}</p><p className="mt-1.5 text-[12.5px] text-ink-3">documentos disponibles</p></div><Chip tone={knowledge.available ? "positive" : "warn"}>{knowledge.available ? "Sincronizado" : "Pendiente"}</Chip></div>
               <div className="border-t border-line pt-3 text-[12.5px] text-ink-3">
-                {latestSync ? `Última sincronización ${formatRelativeDay(latestSync.createdAt)} por ${latestSync.token.label}.` : "Todavía no hay registros de sincronización."}
+                {latestSync ? `Última sincronización ${formatRelativeDay(latestSync.createdAt)} por ${latestSync.token?.label ?? latestSync.developerToken?.user.name ?? "sesión personal"}.` : "Todavía no hay registros de sincronización."}
               </div>
             </div>
           </Panel>

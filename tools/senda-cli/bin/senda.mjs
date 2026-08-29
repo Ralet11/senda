@@ -359,7 +359,9 @@ async function push(root, target, flags) {
   if (target === "milestones" || target === "all") payload.milestones = (await json(path.join(base, "milestones.json"))).milestones;
   if (target === "project-state" || target === "all") payload.projectState = await json(path.join(base, "project-state.json"));
   if (!flags.get("apply")) { console.log("Validación correcta. No se envió nada: agregá --apply para sincronizar."); return; }
-  const token = process.env.SENDA_TOKEN; if (!token) fail("Falta SENDA_TOKEN en el entorno. Nunca lo guardes en .senda/.");
+  // `senda login` is enough for a developer. SENDA_TOKEN stays available for
+  // non-interactive CI or repository agents that cannot access a keychain.
+  const token = process.env.SENDA_TOKEN?.trim() || await developerToken(await loadConfig(root));
   const raw = JSON.stringify(payload);
   const response = await fetch(`${String(config.baseUrl).replace(/\/$/, "")}/api/external/v1/sync`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}`, "idempotency-key": createHash("sha256").update(raw).digest("hex") }, body: raw });
   const data = await response.json().catch(() => null);

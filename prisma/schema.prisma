@@ -147,6 +147,7 @@ model DeveloperCliToken {
   lastUsedAt DateTime?
   revokedAt  DateTime?
   createdAt  DateTime  @default(now())
+  syncEvents ProjectAgentSyncEvent[] @relation("DeveloperCliSyncEvents")
 
   @@index([userId, revokedAt])
 }
@@ -236,8 +237,10 @@ model ProjectAgentSyncEvent {
   id             String            @id @default(cuid())
   project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId      String
-  token          ProjectAgentToken @relation(fields: [tokenId], references: [id], onDelete: Cascade)
-  tokenId        String
+  token          ProjectAgentToken? @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  tokenId        String?
+  developerToken DeveloperCliToken? @relation("DeveloperCliSyncEvents", fields: [developerTokenId], references: [id], onDelete: Cascade)
+  developerTokenId String?
   idempotencyKey String
   action         String
   payloadHash    String
@@ -245,6 +248,7 @@ model ProjectAgentSyncEvent {
   createdAt      DateTime          @default(now())
 
   @@unique([tokenId, idempotencyKey])
+  @@unique([developerTokenId, idempotencyKey])
   @@index([projectId, createdAt])
 }
 
