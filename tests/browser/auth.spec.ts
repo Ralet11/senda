@@ -36,12 +36,12 @@ test("network failure releases the submit state and allows a retry", async ({ pa
   await page.getByLabel("Email").fill("demo@example.com");
   await page.getByLabel("Contraseña").fill("fictional-password");
   await page.getByRole("button", { name: "Ingresar al portal" }).click();
-  await expect(page.getByRole("alert")).toContainText("Revisá tu conexión");
+  await expect(page.locator("form").getByRole("alert")).toContainText("Revisá tu conexión");
   await expect(page.getByRole("button", { name: "Ingresar al portal" })).toBeEnabled();
   await page.unroute("**/api/auth/login");
   await page.route("**/api/auth/login", route => route.fulfill({ status: 401, json: { error: "Credenciales inválidas" } }));
   await page.getByRole("button", { name: "Ingresar al portal" }).click();
-  await expect(page.getByRole("alert")).toHaveText("Credenciales inválidas");
+  await expect(page.locator("form").getByRole("alert")).toHaveText("Credenciales inválidas");
   await expect(page.getByRole("button", { name: "Ingresar al portal" })).toBeEnabled();
 });
 
@@ -51,6 +51,6 @@ test("malformed success is not treated as authenticated", async ({ page }) => {
   await page.getByLabel("Email").fill("demo@example.com");
   await page.getByLabel("Contraseña").fill("fictional-password");
   await page.getByRole("button", { name: "Ingresar al portal" }).click();
-  await expect(page.getByRole("alert")).toContainText("No se pudo confirmar el acceso");
+  await expect(page.locator("form").getByRole("alert")).toContainText("No se pudo confirmar el acceso");
   await expect(page).toHaveURL(/\/login$/);
 });
