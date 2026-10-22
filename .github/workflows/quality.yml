@@ -1,0 +1,29 @@
+name: Web and CLI quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://senda_demo:senda_demo@127.0.0.1:5432/senda_demo
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npm run check
+      - run: npm run test:http
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser

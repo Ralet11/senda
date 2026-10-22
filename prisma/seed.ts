@@ -1,6 +1,11 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
+import { assertSafeDemoSeed } from "./seed-safety.mjs";
+
 import { prisma } from "../src/lib/prisma";
+
+// Validate before performing any database queries or writes.
+assertSafeDemoSeed(process.env);
 
 async function main() {
   const admin = await prisma.user.upsert({

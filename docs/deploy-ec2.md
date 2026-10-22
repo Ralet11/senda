@@ -1,249 +1,55 @@
-# Deploy de Senda en EC2
+# Operación de Senda en EC2
 
-Guia para levantar `senda.prismadevs.com` en el EC2 actual, sin Docker, usando:
+Referencia genérica para una instalación administrada de Next.js, PostgreSQL, PM2 y Nginx. No contiene direcciones ni inventario del host real. Las rutas, dominios, usuarios y credenciales concretas se mantienen fuera del repositorio.
 
-- Node / Next.js
-- PostgreSQL local
-- PM2
-- Nginx
-- Certbot
+**Esta guía no autoriza ni ejecuta un despliegue.** Para explorar el proyecto usar el [arranque local](../README.md). No utilizar el seed demo en producción.
 
-## Supuestos
+## Requisitos de una instalación existente
 
-- Host: `ec2-3-142-93-72.us-east-2.compute.amazonaws.com`
-- Usuario SSH: `ubuntu`
-- Repo: `https://github.com/Ralet11/senda.git`
-- Ruta objetivo: `/home/ubuntu/apps/senda/current`
-- Puerto interno: `3010`
-- Dominio publico: `senda.prismadevs.com`
+- Node.js 24 y dependencias compatibles con el lockfile.
+- Checkout exclusivo para Senda, base y usuario PostgreSQL propios.
+- `.env.production` privado, basado en `.env.production.example`.
+- Proceso PM2 `senda` y puerto interno configurado en `ecosystem.config.cjs`.
+- Reverse proxy y TLS configurados por el responsable de infraestructura.
+- Persistencia y backups para base y adjuntos; recursos suficientes para compilar.
 
-## 1. Preparar carpeta del proyecto
+La instalación inicial de base de datos, reverse proxy, TLS o servicios debe planificarse aparte. No modificar otros servicios del servidor como parte de una actualización de Senda.
+
+## Verificación previa, en un checkout de desarrollo
 
 ```bash
-mkdir -p /home/ubuntu/apps/senda
-cd /home/ubuntu/apps/senda
-git clone https://github.com/Ralet11/senda.git current
-cd current
-```
-
-## 2. Instalar Node si hace falta
-
-Verificar:
-
-```bash
-node -v
-npm -v
-```
-
-Si no esta Node 20+, instalar antes de seguir.
-
-## 3. Crear base y usuario en PostgreSQL local
-
-Entrar a psql:
-
-```bash
-sudo -u postgres psql
-```
-
-Crear DB y usuario propios para Senda:
-
-```sql
-CREATE USER senda_user WITH ENCRYPTED PASSWORD 'CAMBIAR_PASSWORD';
-CREATE DATABASE senda OWNER senda_user;
-\c senda
-GRANT ALL ON SCHEMA public TO senda_user;
-```
-
-## 4. Crear entorno de produccion
-
-```bash
-cd /home/ubuntu/apps/senda/current
-cp .env.production.example .env.production
-nano .env.production
-```
-
-Completar al menos:
-
-```env
-DATABASE_URL="postgresql://senda_user:CAMBIAR_PASSWORD@127.0.0.1:5432/senda?schema=public"
-OPENAI_API_KEY="sk-..."
-OPENAI_MODEL="gpt-5"
-NODE_ENV="production"
-PORT="3010"
-```
-
-## 5. Instalar dependencias y compilar
-
-```bash
-cd /home/ubuntu/apps/senda/current
 npm ci
-npx prisma generate
-npx prisma migrate deploy
-npm run build
+npm run db:generate
+npm run check
 ```
 
-Si queres cargar datos demo:
+Revisar el diff, aprobar el release y comprobar que no contiene secretos. Un build correcto no sustituye los tests funcionales, la validación de migraciones ni la aprobación del despliegue.
 
-```bash
-npm run db:seed
-```
+## Actualización de una instalación existente
 
-No correr seed en produccion real con clientes, salvo que sea un entorno inicial de prueba.
+El único método permitido por `AGENTS.md` es `scripts/deploy.sh`, ejecutado **en el host autorizado**, dentro del checkout de Senda. No ejecutar manualmente allí instalaciones, builds, migraciones o reinicios.
 
-## 6. Levantar con PM2
+Antes de invocarlo, revisar el script de la versión a publicar y verificar:
 
-El repo ya incluye `ecosystem.config.cjs`.
+- Checkout limpio y rama/release correcto.
+- Existencia de `.env.production`, `node_modules` y `.next`.
+- Backup recuperable de PostgreSQL, independiente del backup de código/build.
+- Espacio libre, política de retención y plan de recuperación aprobados.
 
-```bash
-cd /home/ubuntu/apps/senda/current
-pm2 start ecosystem.config.cjs
-pm2 save
-pm2 status
-pm2 logs senda
-```
+El script instala dependencias, genera Prisma, aplica migraciones, compila, reinicia exclusivamente Senda y ejecuta su smoke test local. Puede eliminar backups antiguos según su retención: no ejecutarlo sin revisar ese efecto.
 
-Verificar que responda:
+**El rollback del script no deshace migraciones de base de datos.** Un backup de build/dependencias no sustituye un backup de datos. Cambios de esquema incompatibles necesitan un plan propio de recuperación.
 
-```bash
-curl http://localhost:3010/login
-```
+## Validación posterior
 
-## 7. Configurar Nginx
+Comprobar el commit desplegado, estado del proceso y logs, además de:
 
-Crear un nuevo bloque. No modificar los bloques actuales salvo para agregar este.
+- Login/logout de cuentas autorizadas.
+- Acceso cliente e interno y aislamiento por proyecto.
+- Dashboard, tareas y conversaciones.
+- Asistente con documentación de prueba aprobada.
+- Sincronización mediante token limitado a un proyecto de prueba.
 
-Archivo sugerido:
+Los smoke tests con escrituras deben usar un proyecto descartable aprobado, nunca un proyecto de cliente. Conservar los respaldos necesarios hasta la aceptación del release.
 
-```bash
-sudo nano /etc/nginx/sites-available/senda
-```
-
-Contenido:
-
-```nginx
-server {
-    server_name senda.prismadevs.com;
-
-    location / {
-        proxy_pass http://localhost:3010;
-        proxy_http_version 1.1;
-
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_buffering off;
-    }
-
-    listen 80;
-}
-```
-
-Habilitar:
-
-```bash
-sudo ln -s /etc/nginx/sites-available/senda /etc/nginx/sites-enabled/senda
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-## 8. Apuntar DNS
-
-En la zona DNS de `prismadevs.com` crear:
-
-- tipo: `A`
-- host: `senda`
-- valor: IP publica del EC2
-
-## 9. Emitir SSL con Certbot
-
-Cuando el DNS ya resuelva al EC2:
-
-```bash
-sudo certbot --nginx -d senda.prismadevs.com
-```
-
-Luego validar:
-
-```bash
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-## 10. Checklist de validacion
-
-Validar:
-
-- `https://senda.prismadevs.com/login`
-- login admin
-- login cliente
-- dashboard cliente
-- chat
-- assistant
-- `POST /api/external/v1/sync` con una clave limitada por proyecto
-- assistant con una pregunta funcional documentada dentro de `.senda/knowledge/`
-
-## 11. Flujo de actualizacion de codigo
-
-El unico metodo permitido para actualizar Senda es el script versionado. No ejecutar
-manualmente `npm ci`, builds, migraciones o reinicios de PM2 en el EC2: en una
-instancia pequena esos pasos pueden dejar `node_modules` a medio instalar si se
-interrumpen.
-
-Antes de publicar, desde un checkout local limpio:
-
-```bash
-npm run lint
-npm run build
-git push origin main
-```
-
-Luego, en el EC2 como `ubuntu`:
-
-```bash
-cd /home/ubuntu/apps/senda/current
-chmod +x scripts/deploy.sh
-./scripts/deploy.sh
-```
-
-El script verifica que el checkout este limpio, crea un backup de `.next` y
-`node_modules`, hace `git merge --ff-only`, instala dependencias, genera Prisma,
-aplica migraciones, compila y solo entonces reinicia el proceso PM2 `senda`.
-Tambien ejecuta un smoke test local de `/login`. Si alguna etapa falla, restaura el
-commit, dependencias y build anteriores, y reinicia exclusivamente Senda.
-
-Los backups se conservan en `/home/ubuntu/apps/senda/backups/`; no borrarlos hasta
-haber confirmado el deploy. El script no toca Nginx, PostgreSQL ni otras apps.
-
-### Recuperacion ante host saturado
-
-La instancia actual tiene recursos limitados. Si SSH/HTTPS dejan de responder durante
-un build, no iniciar una segunda instalacion ni reiniciar PM2 a ciegas. Esperar a que
-el host se recupere o revisar el estado desde AWS. Tras un reboot, verificar primero
-que `node_modules/.bin/next` exista antes de iniciar Senda.
-
-## 12. Comando de smoke test del endpoint externo
-
-```bash
-curl -X POST https://senda.prismadevs.com/api/external/v1/sync \
-  -H "Authorization: Bearer senda_pt_TU_TOKEN_DE_PROYECTO" \
-  -H "Idempotency-Key: smoke-test-000000000000" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "version": 1,
-    "action": "tasks",
-    "projectId": "ID_DEL_PROYECTO_ASOCIADO_AL_TOKEN",
-    "agent": "manual-smoke-test",
-    "tasks": [{ "id": "smoke-task", "title": "Tarea de prueba", "status": "IDEAS", "priority": 2 }]
-  }'
-```
-
-## Notas
-
-- No compartir la DB con otros proyectos.
-- No reutilizar puertos ya usados (`3001`, `3005`, `4000`).
-- Mantener Senda aislado en `3010`.
-- Senda no requiere ni debe tener `PROJECT_REPOS_ROOT`: la CLI sincroniza exclusivamente `.senda/knowledge/` como snapshot documental.
-- El server actual ya tiene otros proyectos; cualquier cambio en Nginx debe pasar por `nginx -t` antes de recargar.
+Si el host deja de responder, no iniciar instalaciones paralelas ni reiniciar servicios a ciegas. Investigar recursos y estado antes de reintentar.

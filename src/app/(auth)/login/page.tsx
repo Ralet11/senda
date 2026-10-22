@@ -14,21 +14,32 @@ export default function LoginPage() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (loading) return;
     setError(null);
     setLoading(true);
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await res.json().catch(() => null);
-    setLoading(false);
-    if (!res.ok) {
-      setError(data?.error ?? "No se pudo iniciar sesión");
-      return;
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(typeof data?.error === "string" ? data.error : "No se pudo iniciar sesión");
+        return;
+      }
+      if (!data?.user || typeof data.redirectTo !== "string") {
+        setError("No se pudo confirmar el acceso. Intentá nuevamente.");
+        return;
+      }
+      router.push(data.redirectTo);
+      router.refresh();
+    } catch {
+      setError("No pudimos conectar con el servidor. Revisá tu conexión e intentá nuevamente.");
+    } finally {
+      setLoading(false);
     }
-    router.push(data.redirectTo ?? "/login");
-    router.refresh();
   }
 
   return (
@@ -70,7 +81,7 @@ export default function LoginPage() {
           <ThemeToggle variant="icon" />
         </div>
 
-        <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-6">
+        <form aria-busy={loading} onSubmit={handleSubmit} className="w-full max-w-sm space-y-6">
           <div className="flex items-center gap-2.5 lg:hidden">
             <span
               className="flex h-8 w-8 items-center justify-center rounded-[10px] text-[15px] font-bold"
@@ -112,7 +123,7 @@ export default function LoginPage() {
           </Field>
 
           {error ? (
-            <p className="rounded-control border border-danger/25 bg-danger-soft px-3.5 py-2.5 text-[13px] text-danger">
+            <p role="alert" className="rounded-control border border-danger/25 bg-danger-soft px-3.5 py-2.5 text-[13px] text-danger">
               {error}
             </p>
           ) : null}

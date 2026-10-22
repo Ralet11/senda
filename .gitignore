@@ -55,3 +55,7 @@ senda-ideation-dev*.log
 next-env.d.ts
 
 /src/generated/prisma
+
+# Local browser test artifacts
+/playwright-report/
+/test-results/
