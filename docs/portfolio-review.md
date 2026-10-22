@@ -45,3 +45,11 @@ npm run test:browser
 La suite inicia un servidor de producción local en `127.0.0.1:3212`, sin clave de IA y sin conectar una base real. Cubre vista escritorio/móvil, acceso sin sesión, redirección de registro, persistencia del tema y recuperación de errores de red/respuestas inválidas. Los dos últimos casos interceptan HTTP a propósito: no son evidencia de autenticación real.
 
 Si el entorno tiene un Chromium instalado, se puede seleccionar mediante `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`. Las pruebas requieren que el entorno permita iniciar procesos de navegador y sus sockets temporales. La CI también ejecuta esta suite, pero debe comprobarse el resultado del commit específico antes de declararla pasada.
+
+## Revisión de dependencias (22 de octubre de 2026)
+
+Next.js se actualizó de 16.2.12 a 16.3.8, junto con eslint-config-next, dentro de la misma versión mayor. El inventario previo incluía avisos críticos del framework; el inventario posterior ya no reportó críticos. Referencias: [Windows](https://github.com/advisories/GHSA-p293-qw3h-jr36), [AVIF](https://github.com/advisories/GHSA-2xp9-vwfh-vxw4), [ImageResponse](https://github.com/advisories/GHSA-vcvr-r3jv-pc5j).
+
+Quedan **7 entradas high en npm audit --omit=dev**, no siete explotaciones comprobadas: prisma, @prisma/config, deepmerge-ts, fast-uri, mysql2, nanoid y source-map-js. Prisma está declarado como herramienta de desarrollo pero también aparece como peer opcional de @prisma/client; mysql2/fast-uri/deepmerge-ts llegan por ese árbol. nanoid/source-map-js llegan por PostCSS, usado por Next y tooling CSS. El proyecto usa PostgreSQL, no se encontró uso directo de next/og ni next/image, y no se verificó la exposición del entorno desplegado. Estos hechos no prueban ausencia de riesgo.
+
+La remediación pendiente requiere revisar transitivos y compatibilidad de Prisma; no se forzaron overrides, cambios mayores ni cambios de producción. Este inventario fechado no sustituye un análisis de alcance, una auditoría de seguridad ni aceptación de producción.
